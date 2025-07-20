@@ -1,0 +1,16 @@
+[workspace]
+members = [
+    "rikulox-ast",
+    "rikulox-parse",
+    "rikulox-treewalk",
+    "rikulox-vm",
+]
+resolver = "3"
+
+[workspace.package]
+authors = ["Riku Tatsumi <riku3dno.1@gmail.com>"]
+edition = "2024"
+version = "0.1.0"
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/pullriku/rikulox"

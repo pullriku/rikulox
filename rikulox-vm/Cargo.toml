@@ -1,0 +1,8 @@
+[package]
+name = "rikulox-vm"
+authors.workspace = true
+edition.workspace = true
+version.workspace = true
+readme.workspace = true
+
+[dependencies]
