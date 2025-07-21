@@ -1,0 +1,18 @@
+[package]
+name = "rikulox-cli"
+authors.workspace = true
+edition.workspace = true
+version.workspace = true
+readme.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "CLI for RikuLox"
+
+[[bin]]
+name = "rikulox"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5.41", features = ["derive"] }
+rikulox-scan = { version = "0.1.0", path = "../rikulox-scan" }
