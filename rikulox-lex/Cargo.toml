@@ -1,5 +1,5 @@
 [package]
-name = "rikulox-scan"
+name = "rikulox-lex"
 authors.workspace = true
 edition.workspace = true
 version.workspace = true

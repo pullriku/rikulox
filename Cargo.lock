@@ -168,9 +168,20 @@ name = "rikulox-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "rikulox-lex",
  "rikulox-parse",
- "rikulox-scan",
+ "rikulox-runtime",
+ "rikulox-treewalk",
  "string-interner",
+]
+
+[[package]]
+name = "rikulox-lex"
+version = "0.1.0"
+dependencies = [
+ "rikulox-ast",
+ "string-interner",
+ "unicode-ident",
 ]
 
 [[package]]
@@ -178,7 +189,7 @@ name = "rikulox-parse"
 version = "0.1.0"
 dependencies = [
  "rikulox-ast",
- "rikulox-scan",
+ "rikulox-lex",
  "string-interner",
 ]
 
@@ -190,17 +201,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "rikulox-scan"
+name = "rikulox-treewalk"
 version = "0.1.0"
 dependencies = [
  "rikulox-ast",
- "string-interner",
- "unicode-ident",
+ "rikulox-runtime",
 ]
-
-[[package]]
-name = "rikulox-treewalk"
-version = "0.1.0"
 
 [[package]]
 name = "rikulox-vm"

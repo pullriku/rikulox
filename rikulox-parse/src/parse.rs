@@ -36,10 +36,9 @@ where
         let mut expr = self.comparison()?;
         let expr_span = expr.span;
 
-        while matches!(
-            self.peek_or_err()?.kind,
-            TokenKind::EqualEqual | TokenKind::BangEqual
-        ) {
+        while let Some(token) = self.peek()
+            && matches!(token.kind, TokenKind::EqualEqual | TokenKind::BangEqual)
+        {
             let token = self.advance_or_err()?;
 
             let op = BinOp::try_from(token.kind).unwrap();
@@ -64,10 +63,15 @@ where
         let mut expr = self.term()?;
         let expr_span = expr.span;
 
-        while matches!(
-            self.peek_or_err()?.kind,
-            TokenKind::Greater | TokenKind::GreaterEqual | TokenKind::Less | TokenKind::LessEqual
-        ) {
+        while let Some(token) = self.peek()
+            && matches!(
+                token.kind,
+                TokenKind::Greater
+                    | TokenKind::GreaterEqual
+                    | TokenKind::Less
+                    | TokenKind::LessEqual
+            )
+        {
             let token = self.advance_or_err()?;
 
             let op = BinOp::try_from(token.kind).unwrap();
@@ -92,7 +96,9 @@ where
         let mut expr = self.factor()?;
         let expr_span = expr.span;
 
-        while matches!(self.peek_or_err()?.kind, TokenKind::Plus | TokenKind::Minus) {
+        while let Some(token) = self.peek()
+            && matches!(token.kind, TokenKind::Plus | TokenKind::Minus)
+        {
             let token = self.advance_or_err()?;
 
             let op = BinOp::try_from(token.kind).unwrap();
@@ -117,7 +123,9 @@ where
         let mut expr = self.unary()?;
         let expr_span = expr.span;
 
-        while matches!(self.peek_or_err()?.kind, TokenKind::Star | TokenKind::Slash) {
+        while let Some(token) = self.peek()
+            && matches!(token.kind, TokenKind::Star | TokenKind::Slash)
+        {
             let token = self.advance_or_err()?;
 
             let op = BinOp::try_from(token.kind).unwrap();
@@ -144,14 +152,15 @@ where
 
         match kind {
             TokenKind::Bang | TokenKind::Minus => {
+                let token = self.advance_or_err()?;
                 let right = Box::new(self.unary()?);
                 let right_span = right.span;
                 Ok(Expr {
                     kind: ExprKind::Unary {
-                        op: UnaryOp::try_from(kind).unwrap(),
+                        op: UnaryOp::try_from(token.kind).unwrap(),
                         right,
                     },
-                    span: self.advance_or_err()?.span.with_end_from(right_span),
+                    span: token.span.with_end_from(right_span),
                 })
             }
             _ => self.primary(),
@@ -175,7 +184,12 @@ where
                     kind: ExprKind::Literal(Literal::Nil),
                     span: token.span,
                 },
-                _ => unreachable!(),
+                _ => {
+                    return Err(ParseError {
+                        kind: ParseErrorKind::UnexpectedToken(token.kind),
+                        span: token.span,
+                    });
+                }
             },
             TokenKind::Number(number) => Expr {
                 kind: ExprKind::Literal(Literal::Number(number)),

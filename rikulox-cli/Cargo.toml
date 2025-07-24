@@ -16,5 +16,7 @@ path = "src/main.rs"
 [dependencies]
 clap = { version = "4.5.41", features = ["derive"] }
 rikulox-parse = { version = "0.1.0", path = "../rikulox-parse" }
-rikulox-scan = { version = "0.1.0", path = "../rikulox-scan" }
+rikulox-lex = { version = "0.1.0", path = "../rikulox-lex" }
 string-interner = "0.19.0"
+rikulox-treewalk = { version = "0.1.0", path = "../rikulox-treewalk" }
+rikulox-runtime = { version = "0.1.0", path = "../rikulox-runtime" }

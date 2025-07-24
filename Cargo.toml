@@ -1,5 +1,5 @@
 [workspace]
-members = ["rikulox-ast", "rikulox-parse", "rikulox-runtime", "rikulox-scan", "rikulox-treewalk", "rikulox-vm", "rikulox-cli"]
+members = ["rikulox-ast", "rikulox-parse", "rikulox-runtime", "rikulox-lex", "rikulox-treewalk", "rikulox-vm", "rikulox-cli"]
 resolver = "3"
 
 [workspace.package]
