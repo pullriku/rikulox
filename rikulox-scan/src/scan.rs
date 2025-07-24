@@ -4,12 +4,14 @@ use rikulox_ast::{
     span::Span,
     token::{Keyword, Token, TokenKind},
 };
+use string_interner::{StringInterner, backend::StringBackend};
 
 use crate::error::{ScanError, ScanErrorKind};
 
 pub struct Scanner<'src> {
     source: &'src str,
     chars: Peekable<CharIndices<'src>>,
+    string_interner: &'src mut StringInterner<StringBackend>,
     start: usize,
     current: usize,
     line: usize,
@@ -18,11 +20,21 @@ pub struct Scanner<'src> {
     start_column: usize,
 }
 
+pub struct ScanTokens {
+    pub tokens: Vec<Token>,
+    pub eof_span: Span,
+    pub errors: Vec<ScanError>,
+}
+
 impl<'src> Scanner<'src> {
-    pub fn new(source: &'src str) -> Self {
+    pub fn new(
+        source: &'src str,
+        string_interner: &'src mut StringInterner<StringBackend>,
+    ) -> Self {
         Self {
             source,
             chars: source.char_indices().peekable(),
+            string_interner,
             start: 0,
             current: 0,
             line: 1,
@@ -32,8 +44,28 @@ impl<'src> Scanner<'src> {
         }
     }
 
-    pub fn scan_token(&mut self) -> Option<Result<Token<'src>, ScanError>> {
-        self.skip_whitespace();
+    pub fn scan_tokens(&mut self) -> ScanTokens {
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+
+        while let Some(token) = self.scan_token() {
+            match token {
+                Ok(token) => tokens.push(token),
+                Err(error) => errors.push(error),
+            }
+        }
+
+        let eof_span = self.make_span();
+
+        ScanTokens {
+            tokens,
+            eof_span,
+            errors,
+        }
+    }
+
+    fn scan_token(&mut self) -> Option<Result<Token, ScanError>> {
+        self.skip();
         self.start = self.current;
         self.start_line = self.line;
         self.start_column = self.column;
@@ -80,13 +112,7 @@ impl<'src> Scanner<'src> {
             }
             '/' => {
                 if self.match_char('/') {
-                    while self.peek().is_some_and(|c| c != '\n') {
-                        self.advance();
-                    }
-
-                    self.make_token(TokenKind::LineComment(
-                        &self.source[self.start..=self.current],
-                    ))
+                    unreachable!("comments must be skipped");
                 } else {
                     self.make_token(TokenKind::Slash)
                 }
@@ -113,7 +139,7 @@ impl<'src> Scanner<'src> {
         Some(Ok(token))
     }
 
-    fn number(&mut self) -> Result<Token<'src>, ScanError> {
+    fn number(&mut self) -> Result<Token, ScanError> {
         while self.peek().is_some_and(|c| c.is_ascii_digit()) {
             self.advance();
         }
@@ -134,20 +160,23 @@ impl<'src> Scanner<'src> {
         )))
     }
 
-    fn identifier(&mut self) -> Result<Token<'src>, ScanError> {
+    fn identifier(&mut self) -> Result<Token, ScanError> {
         while self.peek().is_some_and(unicode_ident::is_xid_continue) {
             self.advance();
         }
 
         match Keyword::try_from(&self.source[self.start..self.current]) {
             Ok(keyword) => Ok(self.make_token(TokenKind::Keyword(keyword))),
-            Err(()) => Ok(self.make_token(TokenKind::Identifier(
-                &self.source[self.start..self.current],
-            ))),
+            Err(()) => {
+                let symbol = self
+                    .string_interner
+                    .get_or_intern(&self.source[self.start..self.current]);
+                Ok(self.make_token(TokenKind::Identifier(symbol)))
+            }
         }
     }
 
-    fn string(&mut self) -> Result<Token<'src>, ScanError> {
+    fn string(&mut self) -> Result<Token, ScanError> {
         while self.peek().is_some_and(|c| c != '"') {
             self.advance();
         }
@@ -159,13 +188,20 @@ impl<'src> Scanner<'src> {
         // Advance the closing quote
         self.advance();
 
-        Ok(self.make_token(TokenKind::String(
-            &self.source[self.start + 1..self.current - 1],
-        )))
+        let sym = self
+            .string_interner
+            .get_or_intern(&self.source[self.start + 1..self.current - 1]);
+        Ok(self.make_token(TokenKind::String(sym)))
     }
 
-    fn skip_whitespace(&mut self) {
-        while self.peek().is_some_and(|c| c.is_ascii_whitespace()) {
+    fn is_comment(&mut self) -> bool {
+        self.peek()
+            .is_some_and(|c| c == '/' && self.peek_next().is_some_and(|c| c == '/'))
+    }
+
+    /// Skips whitespace and comments.
+    fn skip(&mut self) {
+        while self.peek().is_some_and(|c| c.is_ascii_whitespace()) || self.is_comment() {
             self.advance();
         }
     }
@@ -183,16 +219,19 @@ impl<'src> Scanner<'src> {
         }
     }
 
-    fn make_token(&self, kind: TokenKind<'src>) -> Token<'src> {
+    fn make_token(&self, kind: TokenKind) -> Token {
         Token {
             kind,
-            lex: &self.source[self.start..self.current],
-            span: Span {
-                start: self.start,
-                end: self.current,
-                line: self.start_line,
-                column: self.start_column,
-            },
+            span: self.make_span(),
+        }
+    }
+
+    fn make_span(&self) -> Span {
+        Span {
+            start: self.start,
+            end: self.current,
+            line: self.start_line,
+            column: self.start_column,
         }
     }
 
@@ -228,15 +267,6 @@ impl<'src> Scanner<'src> {
     }
 
     fn peek_next(&mut self) -> Option<char> {
-        let peek_bytes = self.chars.peek().map(|(index, _char)| *index)?;
-        let index = self.current + peek_bytes;
-        self.source.get(index..).and_then(|s| s.chars().next())
-    }
-}
-
-impl<'src> Iterator for Scanner<'src> {
-    type Item = Result<Token<'src>, ScanError>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.scan_token()
+        self.source[self.current..].chars().nth(1)
     }
 }

@@ -1,14 +1,13 @@
-use crate::span::Span;
+use crate::{span::Span, string::InternSymbol};
 
-#[derive(Debug, Clone)]
-pub struct Token<'src> {
-    pub kind: TokenKind<'src>,
-    pub lex: &'src str,
+#[derive(Debug, Clone, PartialEq)]
+pub struct Token {
+    pub kind: TokenKind,
     pub span: Span,
 }
 
-#[derive(Debug, Clone)]
-pub enum TokenKind<'src> {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TokenKind {
     LParen,
     RParen,
     LBrace,
@@ -20,6 +19,7 @@ pub enum TokenKind<'src> {
     Semicolon,
     Slash,
     Star,
+    Percent,
     Bang,
     BangEqual,
     Equal,
@@ -28,14 +28,13 @@ pub enum TokenKind<'src> {
     GreaterEqual,
     Less,
     LessEqual,
-    Identifier(&'src str),
-    String(&'src str),
+    Identifier(InternSymbol),
+    String(InternSymbol),
     Number(f64),
     Keyword(Keyword),
-    LineComment(&'src str),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Keyword {
     And,
     Class,

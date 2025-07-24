@@ -1,26 +1,44 @@
-use crate::span::Span;
-
-pub type Ast<'src> = Vec<Expr<'src>>;
+use crate::{span::Span, string::InternSymbol, token::TokenKind};
 
 #[derive(Debug, Clone)]
-pub struct Expr<'src> {
-    pub kind: ExprKind<'src>,
+pub struct Expr {
+    pub kind: ExprKind,
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
-pub enum ExprKind<'src> {
+pub enum ExprKind {
     Binary {
-        left: Box<Expr<'src>>,
+        left: Box<Expr>,
         op: BinOp,
-        right: Box<Expr<'src>>,
+        right: Box<Expr>,
     },
     Unary {
-        op: BinOp,
-        right: Box<Expr<'src>>,
+        op: UnaryOp,
+        right: Box<Expr>,
     },
-    Grouping(Box<Expr<'src>>),
-    Literal(Literal<'src>),
+    Grouping(Box<Expr>),
+    Literal(Literal),
+}
+
+#[derive(Debug, Clone)]
+pub enum Literal {
+    Number(f64),
+    String(InternSymbol),
+    Nil,
+    Bool(bool),
+}
+
+#[derive(Debug, Clone)]
+pub enum UnaryOp {
+    Minus,
+    Bang,
+}
+
+bijective_enum_map::injective_enum_map! {
+    UnaryOp, TokenKind,
+    Minus <=> TokenKind::Minus,
+    Bang <=> TokenKind::Bang,
 }
 
 #[derive(Debug, Clone)]
@@ -38,10 +56,17 @@ pub enum BinOp {
     GreaterEqual,
 }
 
-#[derive(Debug, Clone)]
-pub enum Literal<'src> {
-    Number(f64),
-    String(&'src str),
-    Nil,
-    Bool(bool),
+bijective_enum_map::injective_enum_map! {
+    BinOp, TokenKind,
+    Add <=> TokenKind::Plus,
+    Sub <=> TokenKind::Minus,
+    Mul <=> TokenKind::Star,
+    Div <=> TokenKind::Slash,
+    Rem <=> TokenKind::Percent,
+    EqualEqual <=> TokenKind::EqualEqual,
+    BangEqual <=> TokenKind::BangEqual,
+    Less <=> TokenKind::Less,
+    LessEqual <=> TokenKind::LessEqual,
+    Greater <=> TokenKind::Greater,
+    GreaterEqual <=> TokenKind::GreaterEqual,
 }

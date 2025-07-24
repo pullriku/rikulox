@@ -53,6 +53,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bijective-enum-map"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f579474876cbbd08d252854266ed2e43038f0374225c253fbb45f1c383181c6"
+
+[[package]]
 name = "clap"
 version = "4.5.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -99,6 +105,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 
 [[package]]
+name = "foldhash"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
+
+[[package]]
+name = "hashbrown"
+version = "0.15.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5971ac85611da7067dbfcabef3c70ebb5606018acd9e2a3903a0da507521e0d5"
+dependencies = [
+ "foldhash",
+]
+
+[[package]]
 name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -137,18 +158,29 @@ dependencies = [
 [[package]]
 name = "rikulox-ast"
 version = "0.1.0"
+dependencies = [
+ "bijective-enum-map",
+ "string-interner",
+]
 
 [[package]]
 name = "rikulox-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "rikulox-parse",
  "rikulox-scan",
+ "string-interner",
 ]
 
 [[package]]
 name = "rikulox-parse"
 version = "0.1.0"
+dependencies = [
+ "rikulox-ast",
+ "rikulox-scan",
+ "string-interner",
+]
 
 [[package]]
 name = "rikulox-runtime"
@@ -162,6 +194,7 @@ name = "rikulox-scan"
 version = "0.1.0"
 dependencies = [
  "rikulox-ast",
+ "string-interner",
  "unicode-ident",
 ]
 
@@ -172,6 +205,36 @@ version = "0.1.0"
 [[package]]
 name = "rikulox-vm"
 version = "0.1.0"
+
+[[package]]
+name = "serde"
+version = "1.0.219"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f0e2c6ed6606019b4e29e69dbaba95b11854410e5347d525002456dbbb786b6"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.219"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "string-interner"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23de088478b31c349c9ba67816fa55d9355232d63c3afea8bf513e31f0f1d2c0"
+dependencies = [
+ "hashbrown",
+ "serde",
+]
 
 [[package]]
 name = "strsim"
