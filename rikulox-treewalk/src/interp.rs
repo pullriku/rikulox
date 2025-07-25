@@ -1,5 +1,6 @@
 use rikulox_ast::{
-    ast::{BinOp, Expr, ExprKind, Literal, UnaryOp},
+    expr::{BinOp, Expr, ExprKind, Identifier, Literal, UnaryOp},
+    stmt::{Stmt, StmtKind},
     string::Interner,
 };
 use rikulox_runtime::{
@@ -7,28 +8,62 @@ use rikulox_runtime::{
     obj::Object,
 };
 
+use crate::env::Environment;
+
 pub struct TreeWalkInterpreter {
     string_interner: Interner,
+    env: Environment,
 }
 
 impl TreeWalkInterpreter {
-    pub fn new(string_interner: Interner) -> Self {
-        Self { string_interner }
+    pub fn new(string_interner: Interner, env: Environment) -> Self {
+        Self {
+            string_interner,
+            env,
+        }
     }
 
-    pub fn interpret(&mut self, ast: Expr) -> Result<(), RuntimeError> {
-        let object = self.expression(&ast)?;
-        println!("{object}");
+    pub fn into_parts(self) -> (Interner, Environment) {
+        (self.string_interner, self.env)
+    }
+
+    pub fn interpret(&mut self, ast: Vec<Stmt>) -> Result<(), RuntimeError> {
+        for stmt in ast {
+            self.exec(&stmt)?
+        }
         Ok(())
     }
 
-    fn expression(&mut self, expr: &Expr) -> Result<Object, RuntimeError> {
+    fn exec(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+        match &stmt.kind {
+            StmtKind::Expression(expr) => {
+                self.eval(expr)?;
+            }
+            StmtKind::Print(expr) => println!("{}", self.eval(expr)?),
+            StmtKind::Var {
+                name: Identifier { symbol },
+                init,
+            } => {
+                let value = match init {
+                    Some(expr) => self.eval(expr)?,
+                    None => Object::Nil,
+                };
+                self.env.define(
+                    self.string_interner.resolve(*symbol).unwrap().to_string(),
+                    value,
+                );
+            }
+        };
+        Ok(())
+    }
+
+    fn eval(&mut self, expr: &Expr) -> Result<Object, RuntimeError> {
         let object = match &expr.kind {
             ExprKind::Binary { left, op, right } => {
                 self.binary_expr(left.as_ref(), op, right.as_ref(), expr)?
             }
             ExprKind::Unary { op, right } => {
-                let right = self.expression(right.as_ref())?;
+                let right = self.eval(right.as_ref())?;
                 match op {
                     UnaryOp::Minus => match right {
                         Object::Number(n) => Object::Number(-n),
@@ -42,7 +77,7 @@ impl TreeWalkInterpreter {
                     UnaryOp::Bang => Object::Bool(right.is_truthy()),
                 }
             }
-            ExprKind::Grouping(expr) => self.expression(expr.as_ref())?,
+            ExprKind::Grouping(expr) => self.eval(expr.as_ref())?,
             ExprKind::Literal(literal) => match literal {
                 Literal::Number(number) => Object::Number(*number),
                 Literal::String(symbol_u32) => Object::String(
@@ -54,6 +89,20 @@ impl TreeWalkInterpreter {
                 Literal::Nil => Object::Nil,
                 Literal::Bool(bool) => Object::Bool(*bool),
             },
+            ExprKind::Variable(identifier) => {
+                let name = self
+                    .string_interner
+                    .resolve(identifier.symbol)
+                    .unwrap()
+                    .to_string();
+                self.env
+                    .get(&name)
+                    .ok_or(RuntimeError {
+                        kind: RuntimeErrorKind::UndefinedVariable(name),
+                        span: expr.span,
+                    })
+                    .cloned()?
+            }
         };
 
         Ok(object)
@@ -66,7 +115,7 @@ impl TreeWalkInterpreter {
         right: &Expr,
         expr: &Expr,
     ) -> Result<Object, RuntimeError> {
-        let (left, right) = (self.expression(left)?, self.expression(right)?);
+        let (left, right) = (self.eval(left)?, self.eval(right)?);
         let object_opt = match op {
             BinOp::Add => match (left, right) {
                 (Object::Number(l), Object::Number(r)) => Some(Object::Number(l + r)),

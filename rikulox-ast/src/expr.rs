@@ -19,6 +19,12 @@ pub enum ExprKind {
     },
     Grouping(Box<Expr>),
     Literal(Literal),
+    Variable(Identifier),
+}
+
+#[derive(Debug, Clone)]
+pub struct Identifier {
+    pub symbol: InternSymbol,
 }
 
 #[derive(Debug, Clone)]

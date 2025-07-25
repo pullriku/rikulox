@@ -8,7 +8,21 @@ pub struct ParseError {
 
 #[derive(Debug, Clone)]
 pub enum ParseErrorKind {
-    UnexpectedToken(TokenKind),
-    UnexpectedEof,
+    UnexpectedToken {
+        expected: ExpectedItem,
+        found: TokenKind,
+    },
+    UnexpectedEof {
+        expected: ExpectedItem,
+    },
     RParenNotFound,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ExpectedItem {
+    Stmt,
+    Expr,
+    Ident,
+    Token(TokenKind),
+    Unknown,
 }

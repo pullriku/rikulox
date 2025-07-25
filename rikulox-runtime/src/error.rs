@@ -1,4 +1,4 @@
-use rikulox_ast::{ast::Expr, span::Span};
+use rikulox_ast::{expr::Expr, span::Span};
 
 #[derive(Debug, Clone)]
 pub struct RuntimeError {
@@ -9,4 +9,5 @@ pub struct RuntimeError {
 #[derive(Debug, Clone)]
 pub enum RuntimeErrorKind {
     TypeError(Expr),
+    UndefinedVariable(String),
 }
