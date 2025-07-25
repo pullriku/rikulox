@@ -1,5 +1,7 @@
 use std::{
-    io::{self, BufRead, BufReader, Write}, mem, path::Path
+    io::{self, BufRead, BufReader, Write},
+    mem,
+    path::Path,
 };
 
 use rikulox_lex::scan::{ScanTokens, Scanner};
@@ -14,7 +16,11 @@ struct Runner {
 
 impl Runner {
     fn run(&mut self, source: &str) -> io::Result<()> {
-        let ScanTokens { tokens, eof_span, errors: lex_errors } = {
+        let ScanTokens {
+            tokens,
+            eof_span,
+            errors: lex_errors,
+        } = {
             let mut lexer = Scanner::new(source, &mut self.string_interner);
             lexer.scan_tokens()
         };
@@ -38,7 +44,10 @@ impl Runner {
             return Ok(());
         }
 
-        let mut interp = TreeWalkInterpreter::new(mem::take(&mut self.string_interner), mem::take(&mut self.env)); 
+        let mut interp = TreeWalkInterpreter::new(
+            mem::take(&mut self.string_interner),
+            mem::take(&mut self.env),
+        );
 
         if let Err(error) = interp.interpret(ast) {
             println!("{error:?}");
