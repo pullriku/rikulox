@@ -122,6 +122,10 @@ where
                 let print_span = self.advance().unwrap().span;
                 self.print_statement(print_span)
             }
+            TokenKind::LBrace => {
+                let l_brace_span = self.advance().unwrap().span;
+                self.block_statement(l_brace_span)
+            }
             _ => self.expression_statement(),
         }
     }
@@ -135,6 +139,28 @@ where
         })
     }
 
+    fn block_statement(&mut self, l_brace_span: Span) -> Result<Stmt, ParseError> {
+        let (stmts, r_brace_span) = self.block()?;
+        Ok(Stmt {
+            kind: StmtKind::Block(stmts),
+            span: l_brace_span.with_end_from(r_brace_span),
+        })
+    }
+
+    fn block(&mut self) -> Result<(Vec<Stmt>, Span), ParseError> {
+        let mut stmts = Vec::new();
+
+        while let Some(token) = self.peek()
+            && !matches!(token.kind, TokenKind::RBrace)
+        {
+            stmts.push(self.declaration()?);
+        }
+
+        let r_brace = self.consume(&TokenKind::RBrace)?;
+
+        Ok((stmts, r_brace.span))
+    }
+
     fn expression_statement(&mut self) -> Result<Stmt, ParseError> {
         let expr = self.expression()?;
         let expr_span = expr.span;
@@ -146,7 +172,38 @@ where
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.equality()?;
+
+        if let Some(token) = self.peek()
+            && matches!(token.kind, TokenKind::Equal)
+        {
+            let token_eq = self.advance().unwrap();
+            let value = self.assignment()?;
+
+            if let ExprKind::Variable(ident) = expr.kind {
+                Ok(Expr {
+                    kind: ExprKind::Assign {
+                        name: ident,
+                        value: Box::new(value),
+                    },
+                    span: expr.span.with_end_from(token_eq.span),
+                })
+            } else {
+                Err(ParseError {
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: ExpectedItem::Ident,
+                        found: token_eq.kind,
+                    },
+                    span: token_eq.span,
+                })
+            }
+        } else {
+            Ok(expr)
+        }
     }
 
     fn equality(&mut self) -> Result<Expr, ParseError> {

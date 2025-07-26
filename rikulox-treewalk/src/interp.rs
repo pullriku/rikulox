@@ -1,3 +1,5 @@
+use std::{cell::RefCell, mem, rc::Rc};
+
 use rikulox_ast::{
     expr::{BinOp, Expr, ExprKind, Identifier, Literal, UnaryOp},
     stmt::{Stmt, StmtKind},
@@ -12,19 +14,19 @@ use crate::env::Environment;
 
 pub struct TreeWalkInterpreter {
     string_interner: Interner,
-    env: Environment,
+    env: Rc<RefCell<Environment>>,
 }
 
 impl TreeWalkInterpreter {
-    pub fn new(string_interner: Interner, env: Environment) -> Self {
+    pub fn new(string_interner: Interner, env: Rc<RefCell<Environment>>) -> Self {
         Self {
             string_interner,
             env,
         }
     }
 
-    pub fn into_parts(self) -> (Interner, Environment) {
-        (self.string_interner, self.env)
+    pub fn into_interner(self) -> Interner {
+        self.string_interner
     }
 
     pub fn interpret(&mut self, ast: Vec<Stmt>) -> Result<(), RuntimeError> {
@@ -48,13 +50,38 @@ impl TreeWalkInterpreter {
                     Some(expr) => self.eval(expr)?,
                     None => Object::Nil,
                 };
-                self.env.define(
+                self.env.borrow_mut().define(
                     self.string_interner.resolve(*symbol).unwrap().to_string(),
                     value,
                 );
             }
+            StmtKind::Block(stmts) => self.exec_block(
+                stmts,
+                Rc::new(RefCell::new(Environment::with_enclosing(Rc::clone(
+                    &self.env,
+                )))),
+            )?,
         };
         Ok(())
+    }
+
+    fn exec_block(
+        &mut self,
+        stmts: &[Stmt],
+        mut env: Rc<RefCell<Environment>>,
+    ) -> Result<(), RuntimeError> {
+        mem::swap(&mut self.env, &mut env);
+
+        let result: Result<(), RuntimeError> = (|| {
+            for stmt in stmts {
+                self.exec(stmt)?;
+            }
+            Ok(())
+        })();
+
+        mem::swap(&mut self.env, &mut env);
+
+        result
     }
 
     fn eval(&mut self, expr: &Expr) -> Result<Object, RuntimeError> {
@@ -95,13 +122,26 @@ impl TreeWalkInterpreter {
                     .resolve(identifier.symbol)
                     .unwrap()
                     .to_string();
+                self.env.borrow().get(&name).map_err(|kind| RuntimeError {
+                    kind,
+                    span: expr.span,
+                })?
+            }
+            ExprKind::Assign { name, value } => {
+                let value = self.eval(value.as_ref())?;
+                let name = self
+                    .string_interner
+                    .resolve(name.symbol)
+                    .unwrap()
+                    .to_string();
                 self.env
-                    .get(&name)
-                    .ok_or(RuntimeError {
-                        kind: RuntimeErrorKind::UndefinedVariable(name),
+                    .borrow_mut()
+                    .assign(&name, value.clone())
+                    .map_err(|kind| RuntimeError {
+                        kind,
                         span: expr.span,
-                    })
-                    .cloned()?
+                    })?;
+                value
             }
         };
 
@@ -158,7 +198,7 @@ impl TreeWalkInterpreter {
             BinOp::NotEqual => Some(Object::Bool(left != right)),
         };
 
-        object_opt.ok_or(RuntimeError {
+        object_opt.ok_or_else(|| RuntimeError {
             kind: RuntimeErrorKind::TypeError(expr.clone()),
             span: expr.span,
         })

@@ -20,6 +20,10 @@ pub enum ExprKind {
     Grouping(Box<Expr>),
     Literal(Literal),
     Variable(Identifier),
+    Assign {
+        name: Identifier,
+        value: Box<Expr>,
+    },
 }
 
 #[derive(Debug, Clone)]

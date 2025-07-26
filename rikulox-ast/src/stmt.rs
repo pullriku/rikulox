@@ -17,4 +17,5 @@ pub enum StmtKind {
         name: Identifier,
         init: Option<Expr>,
     },
+    Block(Vec<Stmt>),
 }

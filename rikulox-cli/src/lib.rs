@@ -1,7 +1,9 @@
 use std::{
+    cell::RefCell,
     io::{self, BufRead, BufReader, Write},
     mem,
     path::Path,
+    rc::Rc,
 };
 
 use rikulox_lex::scan::{ScanTokens, Scanner};
@@ -11,7 +13,7 @@ use string_interner::{DefaultBackend, StringInterner};
 
 struct Runner {
     string_interner: StringInterner<DefaultBackend>,
-    env: Environment,
+    env: Rc<RefCell<Environment>>,
 }
 
 impl Runner {
@@ -53,9 +55,8 @@ impl Runner {
             println!("{error:?}");
         };
 
-        let (string_interner, env) = interp.into_parts();
+        let string_interner = interp.into_interner();
         self.string_interner = string_interner;
-        self.env = env;
 
         Ok(())
     }
@@ -65,7 +66,7 @@ pub fn run_file(path: &Path) -> io::Result<()> {
     let source = std::fs::read_to_string(path)?;
 
     let mut runner = Runner {
-        env: Environment::new(),
+        env: Rc::new(RefCell::new(Environment::default())),
         string_interner: StringInterner::default(),
     };
 
@@ -78,7 +79,7 @@ pub fn run_repl() -> io::Result<()> {
     let mut reader = BufReader::new(io::stdin());
     let mut line = String::new();
     let mut runner = Runner {
-        env: Environment::new(),
+        env: Rc::new(RefCell::new(Environment::default())),
         string_interner: StringInterner::default(),
     };
 
