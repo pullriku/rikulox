@@ -1,7 +1,7 @@
 use std::iter::Peekable;
 
 use rikulox_ast::{
-    expr::{BinOp, Expr, ExprKind, Identifier, Literal, UnaryOp},
+    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
     span::Span,
     stmt::{Stmt, StmtKind},
     token::{Keyword, Token, TokenKind},
@@ -122,6 +122,10 @@ where
                 let print_span = self.advance().unwrap().span;
                 self.print_statement(print_span)
             }
+            TokenKind::Keyword(Keyword::If) => {
+                let if_span = self.advance().unwrap().span;
+                self.if_statement(if_span)
+            }
             TokenKind::LBrace => {
                 let l_brace_span = self.advance().unwrap().span;
                 self.block_statement(l_brace_span)
@@ -136,6 +140,38 @@ where
         Ok(Stmt {
             kind: StmtKind::Print(expr),
             span: print_span.with_end_from(semi.span),
+        })
+    }
+
+    fn if_statement(&mut self, if_span: Span) -> Result<Stmt, ParseError> {
+        self.consume(&TokenKind::LParen)?;
+        let condition = self.expression()?;
+        self.consume(&TokenKind::RParen)?;
+
+        let then_branch = self.statement()?;
+        let else_branch = match self.peek() {
+            Some(Token {
+                kind: TokenKind::Keyword(Keyword::Else),
+                ..
+            }) => {
+                self.advance().unwrap();
+                Some(self.statement()?)
+            }
+            _ => None,
+        };
+
+        let end_span = match &else_branch {
+            Some(else_branch) => else_branch.span,
+            None => then_branch.span,
+        };
+
+        Ok(Stmt {
+            kind: StmtKind::If {
+                condition,
+                then_branch: Box::new(then_branch),
+                else_branch: else_branch.map(Box::new),
+            },
+            span: if_span.with_end_from(end_span),
         })
     }
 
@@ -176,7 +212,7 @@ where
     }
 
     fn assignment(&mut self) -> Result<Expr, ParseError> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if let Some(token) = self.peek()
             && matches!(token.kind, TokenKind::Equal)
@@ -204,6 +240,50 @@ where
         } else {
             Ok(expr)
         }
+    }
+
+    fn or(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.and()?;
+        let expr_span = expr.span;
+
+        while let Some(token) = self.peek()
+            && matches!(token.kind, TokenKind::Keyword(Keyword::Or))
+        {
+            let token = self.advance().unwrap();
+            let right = self.and()?;
+            expr = Expr {
+                kind: ExprKind::Logical {
+                    left: Box::new(expr),
+                    op: LogicalOp::Or,
+                    right: Box::new(right),
+                },
+                span: expr_span.with_end_from(token.span),
+            };
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.equality()?;
+        let expr_span = expr.span;
+
+        while let Some(token) = self.peek()
+            && matches!(token.kind, TokenKind::Keyword(Keyword::And))
+        {
+            let token = self.advance().unwrap();
+            let right = self.equality()?;
+            expr = Expr {
+                kind: ExprKind::Logical {
+                    left: Box::new(expr),
+                    op: LogicalOp::And,
+                    right: Box::new(right),
+                },
+                span: expr_span.with_end_from(token.span),
+            };
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr, ParseError> {

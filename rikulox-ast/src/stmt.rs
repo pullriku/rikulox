@@ -18,4 +18,9 @@ pub enum StmtKind {
         init: Option<Expr>,
     },
     Block(Vec<Stmt>),
+    If {
+        condition: Expr,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    },
 }

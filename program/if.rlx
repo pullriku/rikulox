@@ -1,0 +1,14 @@
+var first = true;
+var second = false;
+
+print "↓false↓";
+if (first) if (second) print "true"; else print "false";
+
+var a = false;
+{
+    var a = true;
+    print "↓true↓";
+    if (a) print "true"; else print "false";
+}
+print "↓false↓";
+if (a) print "true"; else print "false";

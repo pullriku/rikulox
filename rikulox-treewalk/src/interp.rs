@@ -1,7 +1,7 @@
 use std::{cell::RefCell, mem, rc::Rc};
 
 use rikulox_ast::{
-    expr::{BinOp, Expr, ExprKind, Identifier, Literal, UnaryOp},
+    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
     stmt::{Stmt, StmtKind},
     string::Interner,
 };
@@ -61,6 +61,17 @@ impl TreeWalkInterpreter {
                     &self.env,
                 )))),
             )?,
+            StmtKind::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                if self.eval(condition)?.is_truthy() {
+                    self.exec(then_branch.as_ref())?
+                } else if let Some(else_branch) = else_branch {
+                    self.exec(else_branch.as_ref())?
+                }
+            }
         };
         Ok(())
     }
@@ -142,6 +153,24 @@ impl TreeWalkInterpreter {
                         span: expr.span,
                     })?;
                 value
+            }
+            ExprKind::Logical { left, op, right } => {
+                let left = self.eval(left.as_ref())?;
+
+                match op {
+                    LogicalOp::And => {
+                        if !left.is_truthy() {
+                            return Ok(left);
+                        }
+                    }
+                    LogicalOp::Or => {
+                        if left.is_truthy() {
+                            return Ok(left);
+                        }
+                    }
+                }
+
+                self.eval(right.as_ref())?
             }
         };
 

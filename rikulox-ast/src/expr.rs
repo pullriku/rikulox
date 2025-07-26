@@ -1,4 +1,8 @@
-use crate::{span::Span, string::InternSymbol, token::TokenKind};
+use crate::{
+    span::Span,
+    string::InternSymbol,
+    token::{Keyword, TokenKind},
+};
 
 #[derive(Debug, Clone)]
 pub struct Expr {
@@ -23,6 +27,11 @@ pub enum ExprKind {
     Assign {
         name: Identifier,
         value: Box<Expr>,
+    },
+    Logical {
+        left: Box<Expr>,
+        op: LogicalOp,
+        right: Box<Expr>,
     },
 }
 
@@ -79,4 +88,16 @@ bijective_enum_map::injective_enum_map! {
     LessEqual <=> TokenKind::LessEqual,
     Greater <=> TokenKind::Greater,
     GreaterEqual <=> TokenKind::GreaterEqual,
+}
+
+#[derive(Debug, Clone)]
+pub enum LogicalOp {
+    And,
+    Or,
+}
+
+bijective_enum_map::injective_enum_map! {
+    LogicalOp, TokenKind,
+    And <=> TokenKind::Keyword(Keyword::And),
+    Or <=> TokenKind::Keyword(Keyword::Or),
 }
