@@ -1,10 +1,7 @@
 use std::iter::Peekable;
 
 use rikulox_ast::{
-    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
-    span::Span,
-    stmt::{Stmt, StmtKind},
-    token::{Keyword, Token, TokenKind},
+    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp}, id::IdGen, span::Span, stmt::{Stmt, StmtKind}, token::{Keyword, Token, TokenKind}
 };
 
 use crate::error::{ExpectedItem, ParseError, ParseErrorKind};
@@ -15,6 +12,7 @@ where
 {
     tokens: Peekable<I>,
     eof_span: Span,
+    id_gen: IdGen,
 }
 
 impl<I> Parser<I>
@@ -22,7 +20,7 @@ where
     I: Iterator<Item = Token>,
 {
     pub fn new(tokens: Peekable<I>, eof_span: Span) -> Self {
-        Self { tokens, eof_span }
+        Self { tokens, eof_span, id_gen: IdGen::new() }
     }
 
     pub fn parse(&mut self) -> Result<Vec<Stmt>, ParseError> {
@@ -110,6 +108,7 @@ where
                 init,
             },
             span: var_span.with_end_from(semi.span),
+            id: self.id_gen.next_id(),
         })
     }
 
@@ -122,9 +121,17 @@ where
                 let print_span = self.advance().unwrap().span;
                 self.print_statement(print_span)
             }
+            TokenKind::Keyword(Keyword::While) => {
+                let while_span = self.advance().unwrap().span;
+                self.while_statement(while_span)
+            }
             TokenKind::Keyword(Keyword::If) => {
                 let if_span = self.advance().unwrap().span;
                 self.if_statement(if_span)
+            }
+            TokenKind::Keyword(Keyword::For) => {
+                let for_span = self.advance().unwrap().span;
+                self.for_statement(for_span)
             }
             TokenKind::LBrace => {
                 let l_brace_span = self.advance().unwrap().span;
@@ -140,6 +147,111 @@ where
         Ok(Stmt {
             kind: StmtKind::Print(expr),
             span: print_span.with_end_from(semi.span),
+            id: self.id_gen.next_id(),
+        })
+    }
+
+    fn for_statement(&mut self, for_span: Span) -> Result<Stmt, ParseError> {
+        self.consume(&TokenKind::LParen)?;
+
+        let init = match self.peek() {
+            Some(Token {
+                kind: TokenKind::Semicolon,
+                ..
+            }) => {
+                self.advance().unwrap();
+                None
+            }
+            Some(Token {
+                kind: TokenKind::Keyword(Keyword::Var),
+                ..
+            }) => {
+                let var_span = self.advance().unwrap().span;
+                Some(self.var_decl(var_span)?)
+            }
+            _ => Some(self.expression_statement()?),
+        };
+
+        let condition = match self.peek() {
+            Some(Token {
+                kind: TokenKind::Semicolon,
+                ..
+            }) => None,
+            _ => Some(self.expression()?),
+        };
+
+        self.consume(&TokenKind::Semicolon)?;
+
+        let increment = match self.peek() {
+            Some(Token {
+                kind: TokenKind::RParen,
+                ..
+            }) => None,
+            _ => Some(self.expression()?),
+        };
+
+        self.consume(&TokenKind::RParen)?;
+
+        let body = self.statement()?;
+
+        let body_span = body.span;
+        let all_span = for_span.with_end_from(body_span);
+        let condition = condition.unwrap_or(Expr {
+            kind: ExprKind::Literal(Literal::Bool(true)),
+            span: for_span.with_end_from(all_span),
+            id: self.id_gen.next_id(),
+        });
+
+        let body = match increment {
+            Some(increment) => Stmt {
+                kind: StmtKind::Block(vec![body, Stmt {
+                    kind: StmtKind::Expression(increment),
+                    span: body_span,
+                    id: self.id_gen.next_id(),
+                }]),
+                span: all_span,
+                id: self.id_gen.next_id(),
+            },
+            None => body,
+        };
+
+        let while_body = Stmt {
+            kind: StmtKind::While {
+                condition,
+                body: Box::new(body),
+            },
+            span: all_span,
+            id: self.id_gen.next_id(),
+        };
+
+        let body = match init {
+            Some(init) => Stmt {
+                kind: StmtKind::Block(vec![init, while_body]),
+                span: all_span,
+                id: self.id_gen.next_id(),
+            },
+            None => while_body,
+        };
+
+        Ok(body)
+
+    }
+
+    fn while_statement(&mut self, while_span: Span) -> Result<Stmt, ParseError> {
+        self.consume(&TokenKind::LParen)?;
+        let condition = self.expression()?;
+        self.consume(&TokenKind::RParen)?;
+
+        let body = self.statement()?;
+
+        let end_span = body.span;
+        Ok(Stmt {
+            kind: StmtKind::While {
+                condition,
+                body: Box::new(body),
+            },
+            span: while_span.with_end_from(end_span),
+            id: self.id_gen.next_id(),
         })
     }
 
@@ -172,6 +284,7 @@ where
                 else_branch: else_branch.map(Box::new),
             },
             span: if_span.with_end_from(end_span),
+            id: self.id_gen.next_id(),
         })
     }
 
@@ -180,6 +293,7 @@ where
         Ok(Stmt {
             kind: StmtKind::Block(stmts),
             span: l_brace_span.with_end_from(r_brace_span),
+            id: self.id_gen.next_id(),
         })
     }
 
@@ -204,6 +318,7 @@ where
         Ok(Stmt {
             kind: StmtKind::Expression(expr),
             span: expr_span.with_end_from(semi.span),
+            id: self.id_gen.next_id(),
         })
     }
 
@@ -227,6 +342,7 @@ where
                         value: Box::new(value),
                     },
                     span: expr.span.with_end_from(token_eq.span),
+                    id: self.id_gen.next_id(),
                 })
             } else {
                 Err(ParseError {
@@ -258,6 +374,7 @@ where
                     right: Box::new(right),
                 },
                 span: expr_span.with_end_from(token.span),
+                id: self.id_gen.next_id(),
             };
         }
 
@@ -280,6 +397,7 @@ where
                     right: Box::new(right),
                 },
                 span: expr_span.with_end_from(token.span),
+                id: self.id_gen.next_id(),
             };
         }
 
@@ -307,6 +425,7 @@ where
                     right: Box::new(right),
                 },
                 span: expr_span.with_end_from(right_span),
+                id: self.id_gen.next_id(),
             }
         }
 
@@ -340,6 +459,7 @@ where
                     right: Box::new(right),
                 },
                 span: expr_span.with_end_from(right_span),
+                id: self.id_gen.next_id(),
             }
         }
 
@@ -367,6 +487,7 @@ where
                     right: Box::new(right),
                 },
                 span: expr_span.with_end_from(right_span),
+                id: self.id_gen.next_id(),
             }
         }
 
@@ -394,6 +515,7 @@ where
                     right: Box::new(right),
                 },
                 span: expr_span.with_end_from(right_span),
+                id: self.id_gen.next_id(),
             }
         }
 
@@ -415,6 +537,7 @@ where
                         right,
                     },
                     span: token.span.with_end_from(right_span),
+                    id: self.id_gen.next_id(),
                 })
             }
             _ => self.primary(),
@@ -429,14 +552,17 @@ where
                 Keyword::False => Expr {
                     kind: ExprKind::Literal(Literal::Bool(false)),
                     span: token.span,
+                    id: self.id_gen.next_id(),
                 },
                 Keyword::True => Expr {
                     kind: ExprKind::Literal(Literal::Bool(true)),
                     span: token.span,
+                    id: self.id_gen.next_id(),
                 },
                 Keyword::Nil => Expr {
                     kind: ExprKind::Literal(Literal::Nil),
                     span: token.span,
+                    id: self.id_gen.next_id(),
                 },
                 _ => {
                     return Err(ParseError {
@@ -451,14 +577,17 @@ where
             TokenKind::Identifier(symbol) => Expr {
                 kind: ExprKind::Variable(Identifier { symbol }),
                 span: token.span,
+                id: self.id_gen.next_id(),
             },
             TokenKind::Number(number) => Expr {
                 kind: ExprKind::Literal(Literal::Number(number)),
                 span: token.span,
+                id: self.id_gen.next_id(),
             },
             TokenKind::String(string) => Expr {
                 kind: ExprKind::Literal(Literal::String(string)),
                 span: token.span,
+                id: self.id_gen.next_id(),
             },
             TokenKind::LParen => {
                 let expr = Box::new(self.expression()?);
@@ -466,6 +595,7 @@ where
                 Expr {
                     kind: ExprKind::Grouping(expr),
                     span: token.span.with_end_from(r_paren.span),
+                    id: self.id_gen.next_id(),
                 }
             }
             _ => {

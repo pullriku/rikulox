@@ -230,8 +230,6 @@ impl<'src> Scanner<'src> {
         Span {
             start: self.start,
             end: self.current,
-            line: self.start_line,
-            column: self.start_column,
         }
     }
 
@@ -241,8 +239,6 @@ impl<'src> Scanner<'src> {
             span: Span {
                 start: self.start,
                 end: self.current,
-                line: self.start_line,
-                column: self.start_column,
             },
         }
     }

@@ -1,13 +1,12 @@
 use crate::{
-    span::Span,
-    string::InternSymbol,
-    token::{Keyword, TokenKind},
+    id::NodeId, span::Span, string::InternSymbol, token::{Keyword, TokenKind}
 };
 
 #[derive(Debug, Clone)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
+    pub id: NodeId,
 }
 
 #[derive(Debug, Clone)]

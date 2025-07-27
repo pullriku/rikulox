@@ -72,6 +72,11 @@ impl TreeWalkInterpreter {
                     self.exec(else_branch.as_ref())?
                 }
             }
+            StmtKind::While { condition, body } => {
+                while self.eval(condition)?.is_truthy() {
+                    self.exec(body.as_ref())?
+                }
+            }
         };
         Ok(())
     }

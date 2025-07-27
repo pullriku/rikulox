@@ -42,6 +42,8 @@ impl Runner {
             }
         };
 
+        dbg!(&ast);
+
         if !lex_errors.is_empty() {
             return Ok(());
         }

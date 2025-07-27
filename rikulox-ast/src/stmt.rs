@@ -1,12 +1,12 @@
 use crate::{
-    expr::{Expr, Identifier},
-    span::Span,
+    expr::{Expr, Identifier}, id::NodeId, span::Span
 };
 
 #[derive(Debug, Clone)]
 pub struct Stmt {
     pub kind: StmtKind,
     pub span: Span,
+    pub id: NodeId,
 }
 
 #[derive(Debug, Clone)]
@@ -22,5 +22,9 @@ pub enum StmtKind {
         condition: Expr,
         then_branch: Box<Stmt>,
         else_branch: Option<Box<Stmt>>,
+    },
+    While {
+        condition: Expr,
+        body: Box<Stmt>,
     },
 }
