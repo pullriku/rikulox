@@ -2,7 +2,7 @@
 pub struct NodeId(pub u32);
 
 #[derive(Debug, Clone)]
-pub  struct IdGen {
+pub struct IdGen {
     next: u32,
 }
 

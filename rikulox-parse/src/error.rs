@@ -16,6 +16,7 @@ pub enum ParseErrorKind {
         expected: ExpectedItem,
     },
     RParenNotFound,
+    TooManyArguments,
 }
 
 #[derive(Debug, Clone, Copy)]

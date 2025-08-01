@@ -12,7 +12,10 @@ impl Span {
     }
 
     pub fn empty_at(pos: usize) -> Self {
-        Span { start: pos, end: pos }
+        Span {
+            start: pos,
+            end: pos,
+        }
     }
 
     pub fn empty_from_start(span: Span) -> Self {

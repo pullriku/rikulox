@@ -1,5 +1,8 @@
 use crate::{
-    id::NodeId, span::Span, string::InternSymbol, token::{Keyword, TokenKind}
+    id::NodeId,
+    span::Span,
+    string::InternSymbol,
+    token::{Keyword, TokenKind},
 };
 
 #[derive(Debug, Clone)]
@@ -31,6 +34,10 @@ pub enum ExprKind {
         left: Box<Expr>,
         op: LogicalOp,
         right: Box<Expr>,
+    },
+    Call {
+        callee: Box<Expr>,
+        args: Vec<Expr>,
     },
 }
 

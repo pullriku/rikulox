@@ -1,11 +1,13 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use rikulox_runtime::{error::RuntimeErrorKind, obj::Object};
+use rikulox_runtime::error::RuntimeErrorKind;
+
+use crate::value::Value;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
     enclosing: Option<Rc<RefCell<Environment>>>,
-    values: HashMap<String, Object>,
+    values: HashMap<String, Value>,
 }
 
 impl Environment {
@@ -23,11 +25,11 @@ impl Environment {
         }
     }
 
-    pub fn define(&mut self, name: String, value: Object) {
+    pub fn define(&mut self, name: String, value: Value) {
         self.values.insert(name, value);
     }
 
-    pub fn assign(&mut self, name: &str, value: Object) -> Result<(), RuntimeErrorKind> {
+    pub fn assign(&mut self, name: &str, value: Value) -> Result<(), RuntimeErrorKind> {
         match (self.values.get_mut(name), &self.enclosing) {
             (Some(var), _) => {
                 *var = value;
@@ -38,7 +40,7 @@ impl Environment {
         }
     }
 
-    pub fn get(&self, name: &str) -> Result<Object, RuntimeErrorKind> {
+    pub fn get(&self, name: &str) -> Result<Value, RuntimeErrorKind> {
         match (self.values.get(name), &self.enclosing) {
             (Some(var), _) => Ok(var.clone()),
             (None, Some(enclosing)) => enclosing.borrow().get(name),

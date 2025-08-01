@@ -176,6 +176,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "rikulox-gc"
+version = "0.1.0"
+
+[[package]]
 name = "rikulox-lex"
 version = "0.1.0"
 dependencies = [

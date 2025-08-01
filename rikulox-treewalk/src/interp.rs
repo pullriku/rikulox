@@ -5,12 +5,9 @@ use rikulox_ast::{
     stmt::{Stmt, StmtKind},
     string::Interner,
 };
-use rikulox_runtime::{
-    error::{RuntimeError, RuntimeErrorKind},
-    obj::Object,
-};
+use rikulox_runtime::error::{RuntimeError, RuntimeErrorKind};
 
-use crate::env::Environment;
+use crate::{env::Environment, value::Value};
 
 pub struct TreeWalkInterpreter {
     string_interner: Interner,
@@ -48,7 +45,7 @@ impl TreeWalkInterpreter {
             } => {
                 let value = match init {
                     Some(expr) => self.eval(expr)?,
-                    None => Object::Nil,
+                    None => Value::Nil,
                 };
                 self.env.borrow_mut().define(
                     self.string_interner.resolve(*symbol).unwrap().to_string(),
@@ -100,7 +97,7 @@ impl TreeWalkInterpreter {
         result
     }
 
-    fn eval(&mut self, expr: &Expr) -> Result<Object, RuntimeError> {
+    fn eval(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
         let object = match &expr.kind {
             ExprKind::Binary { left, op, right } => {
                 self.binary_expr(left.as_ref(), op, right.as_ref(), expr)?
@@ -109,7 +106,7 @@ impl TreeWalkInterpreter {
                 let right = self.eval(right.as_ref())?;
                 match op {
                     UnaryOp::Minus => match right {
-                        Object::Number(n) => Object::Number(-n),
+                        Value::Number(n) => Value::Number(-n),
                         _ => {
                             return Err(RuntimeError {
                                 kind: RuntimeErrorKind::TypeError(expr.clone()),
@@ -117,20 +114,20 @@ impl TreeWalkInterpreter {
                             });
                         }
                     },
-                    UnaryOp::Bang => Object::Bool(right.is_truthy()),
+                    UnaryOp::Bang => Value::Bool(right.is_truthy()),
                 }
             }
             ExprKind::Grouping(expr) => self.eval(expr.as_ref())?,
             ExprKind::Literal(literal) => match literal {
-                Literal::Number(number) => Object::Number(*number),
-                Literal::String(symbol_u32) => Object::String(
+                Literal::Number(number) => Value::Number(*number),
+                Literal::String(symbol_u32) => Value::String(
                     self.string_interner
                         .resolve(*symbol_u32)
                         .unwrap()
                         .to_string(),
                 ),
-                Literal::Nil => Object::Nil,
-                Literal::Bool(bool) => Object::Bool(*bool),
+                Literal::Nil => Value::Nil,
+                Literal::Bool(bool) => Value::Bool(*bool),
             },
             ExprKind::Variable(identifier) => {
                 let name = self
@@ -188,48 +185,48 @@ impl TreeWalkInterpreter {
         op: &BinOp,
         right: &Expr,
         expr: &Expr,
-    ) -> Result<Object, RuntimeError> {
+    ) -> Result<Value, RuntimeError> {
         let (left, right) = (self.eval(left)?, self.eval(right)?);
         let object_opt = match op {
             BinOp::Add => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Some(Object::Number(l + r)),
-                (Object::String(l), Object::String(r)) => Some(Object::String(l + &r)),
+                (Value::Number(l), Value::Number(r)) => Some(Value::Number(l + r)),
+                (Value::String(l), Value::String(r)) => Some(Value::String(l + &r)),
                 _ => None,
             },
             BinOp::Sub => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Some(Object::Number(l - r)),
+                (Value::Number(l), Value::Number(r)) => Some(Value::Number(l - r)),
                 _ => None,
             },
             BinOp::Mul => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Some(Object::Number(l * r)),
+                (Value::Number(l), Value::Number(r)) => Some(Value::Number(l * r)),
                 _ => None,
             },
             BinOp::Rem => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Some(Object::Number(l % r)),
+                (Value::Number(l), Value::Number(r)) => Some(Value::Number(l % r)),
                 _ => None,
             },
             BinOp::Div => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Some(Object::Number(l / r)),
+                (Value::Number(l), Value::Number(r)) => Some(Value::Number(l / r)),
                 _ => None,
             },
             BinOp::Greater => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Some(Object::Bool(l > r)),
+                (Value::Number(l), Value::Number(r)) => Some(Value::Bool(l > r)),
                 _ => None,
             },
             BinOp::GreaterEqual => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Some(Object::Bool(l >= r)),
+                (Value::Number(l), Value::Number(r)) => Some(Value::Bool(l >= r)),
                 _ => None,
             },
             BinOp::Less => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Some(Object::Bool(l < r)),
+                (Value::Number(l), Value::Number(r)) => Some(Value::Bool(l < r)),
                 _ => None,
             },
             BinOp::LessEqual => match (left, right) {
-                (Object::Number(l), Object::Number(r)) => Some(Object::Bool(l <= r)),
+                (Value::Number(l), Value::Number(r)) => Some(Value::Bool(l <= r)),
                 _ => None,
             },
-            BinOp::Equal => Some(Object::Bool(left == right)),
-            BinOp::NotEqual => Some(Object::Bool(left != right)),
+            BinOp::Equal => Some(Value::Bool(left == right)),
+            BinOp::NotEqual => Some(Value::Bool(left != right)),
         };
 
         object_opt.ok_or_else(|| RuntimeError {

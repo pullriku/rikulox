@@ -1,0 +1,11 @@
+[package]
+name = "rikulox-gc"
+authors.workspace = true
+edition.workspace = true
+version.workspace = true
+readme.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]

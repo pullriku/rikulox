@@ -1,10 +1,16 @@
 use std::iter::Peekable;
 
 use rikulox_ast::{
-    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp}, id::IdGen, span::Span, stmt::{Stmt, StmtKind}, token::{Keyword, Token, TokenKind}
+    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
+    id::IdGen,
+    span::Span,
+    stmt::{Stmt, StmtKind},
+    token::{Keyword, Token, TokenKind},
 };
 
 use crate::error::{ExpectedItem, ParseError, ParseErrorKind};
+
+pub const MAX_ARGS: usize = u8::MAX as usize;
 
 pub struct Parser<I>
 where
@@ -20,7 +26,11 @@ where
     I: Iterator<Item = Token>,
 {
     pub fn new(tokens: Peekable<I>, eof_span: Span) -> Self {
-        Self { tokens, eof_span, id_gen: IdGen::new() }
+        Self {
+            tokens,
+            eof_span,
+            id_gen: IdGen::new(),
+        }
     }
 
     pub fn parse(&mut self) -> Result<Vec<Stmt>, ParseError> {
@@ -204,11 +214,14 @@ where
 
         let body = match increment {
             Some(increment) => Stmt {
-                kind: StmtKind::Block(vec![body, Stmt {
-                    kind: StmtKind::Expression(increment),
-                    span: body_span,
-                    id: self.id_gen.next_id(),
-                }]),
+                kind: StmtKind::Block(vec![
+                    body,
+                    Stmt {
+                        kind: StmtKind::Expression(increment),
+                        span: body_span,
+                        id: self.id_gen.next_id(),
+                    },
+                ]),
                 span: all_span,
                 id: self.id_gen.next_id(),
             },
@@ -234,7 +247,6 @@ where
         };
 
         Ok(body)
-
     }
 
     fn while_statement(&mut self, while_span: Span) -> Result<Stmt, ParseError> {
@@ -540,8 +552,60 @@ where
                     id: self.id_gen.next_id(),
                 })
             }
-            _ => self.primary(),
+            _ => self.call(),
         }
+    }
+
+    fn call(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.primary()?;
+        let expr_span = expr.span;
+
+        while let Some(token) = self.peek()
+            && matches!(token.kind, TokenKind::LParen)
+        {
+            let l_paren = self.advance().unwrap();
+            let (args, r_paren_span) = self.arguments(l_paren.span)?;
+
+            expr = Expr {
+                kind: ExprKind::Call {
+                    callee: Box::new(expr),
+                    args,
+                },
+                span: expr_span.with_end_from(r_paren_span),
+                id: self.id_gen.next_id(),
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn arguments(&mut self, l_paren_span: Span) -> Result<(Vec<Expr>, Span), ParseError> {
+        let mut args = Vec::new();
+
+        if let Some(token) = self.peek()
+            && !matches!(token.kind, TokenKind::RParen)
+        {
+            loop {
+                args.push(self.expression()?);
+
+                if let Some(token) = self.peek()
+                    && !matches!(token.kind, TokenKind::Comma)
+                {
+                    break;
+                }
+            }
+        }
+
+        let r_paren = self.advance_or_err(ExpectedItem::Token(TokenKind::RParen))?;
+
+        if args.len() >= MAX_ARGS {
+            return Err(ParseError {
+                kind: ParseErrorKind::TooManyArguments,
+                span: l_paren_span.with_end_from(r_paren.span),
+            });
+        }
+
+        Ok((args, r_paren.span))
     }
 
     fn primary(&mut self) -> Result<Expr, ParseError> {

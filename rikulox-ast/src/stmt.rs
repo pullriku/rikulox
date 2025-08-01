@@ -1,5 +1,7 @@
 use crate::{
-    expr::{Expr, Identifier}, id::NodeId, span::Span
+    expr::{Expr, Identifier},
+    id::NodeId,
+    span::Span,
 };
 
 #[derive(Debug, Clone)]
