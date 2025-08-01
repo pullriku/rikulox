@@ -29,7 +29,9 @@ impl<T: Trace> Heap<T> {
         }
 
         while let Some(entry_ref) = self.tracer.worklist.pop() {
-            self.tracer.visit(entry_ref);
+            if let Some(value) = self.list.get(entry_ref) {
+                value.trace(&mut self.tracer);
+            }
         }
     }
 
