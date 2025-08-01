@@ -4,14 +4,14 @@ use crate::{
     span::Span,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Stmt {
     pub kind: StmtKind,
     pub span: Span,
     pub id: NodeId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum StmtKind {
     Expression(Expr),
     Print(Expr),
@@ -29,4 +29,12 @@ pub enum StmtKind {
         condition: Expr,
         body: Box<Stmt>,
     },
+    Function(FunctionDecl),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionDecl {
+    pub name: Identifier,
+    pub params: Vec<Identifier>,
+    pub body: Vec<Stmt>,
 }

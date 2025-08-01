@@ -49,6 +49,14 @@ impl<T: Trace> Heap<T> {
 
         self.tracer.clear();
     }
+
+    pub fn get(&self, entry_ref: EntryRef<T>) -> Option<&T> {
+        self.list.get(entry_ref)
+    }
+
+    pub fn get_mut(&mut self, entry_ref: EntryRef<T>) -> Option<&mut T> {
+        self.list.get_mut(entry_ref)
+    }
 }
 
 impl<T: Trace> Default for Heap<T> {

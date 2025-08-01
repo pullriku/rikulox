@@ -38,7 +38,8 @@ impl<T> FreeList<T> {
     fn grow(&mut self) {
         const MIN_CAPACITY: usize = 16;
         const GROW_FACTOR: usize = 2;
-        let additional = (self.entries.len() * (GROW_FACTOR - 1)).max(MIN_CAPACITY);
+        let additional =
+            (self.entries.len() * (GROW_FACTOR - 1)).max(MIN_CAPACITY);
         self.reserve(additional);
     }
 
@@ -102,7 +103,9 @@ impl<T> FreeList<T> {
             })
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (EntryRef<T>, &mut T)> + '_ {
+    pub fn iter_mut(
+        &mut self,
+    ) -> impl Iterator<Item = (EntryRef<T>, &mut T)> + '_ {
         self.entries
             .iter_mut()
             .enumerate()

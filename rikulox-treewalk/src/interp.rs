@@ -15,7 +15,10 @@ pub struct TreeWalkInterpreter {
 }
 
 impl TreeWalkInterpreter {
-    pub fn new(string_interner: Interner, env: Rc<RefCell<Environment>>) -> Self {
+    pub fn new(
+        string_interner: Interner,
+        env: Rc<RefCell<Environment>>,
+    ) -> Self {
         Self {
             string_interner,
             env,
@@ -147,13 +150,12 @@ impl TreeWalkInterpreter {
                     .resolve(name.symbol)
                     .unwrap()
                     .to_string();
-                self.env
-                    .borrow_mut()
-                    .assign(&name, value.clone())
-                    .map_err(|kind| RuntimeError {
+                self.env.borrow_mut().assign(&name, value.clone()).map_err(
+                    |kind| RuntimeError {
                         kind,
                         span: expr.span,
-                    })?;
+                    },
+                )?;
                 value
             }
             ExprKind::Logical { left, op, right } => {
@@ -189,40 +191,60 @@ impl TreeWalkInterpreter {
         let (left, right) = (self.eval(left)?, self.eval(right)?);
         let object_opt = match op {
             BinOp::Add => match (left, right) {
-                (Value::Number(l), Value::Number(r)) => Some(Value::Number(l + r)),
-                (Value::String(l), Value::String(r)) => Some(Value::String(l + &r)),
+                (Value::Number(l), Value::Number(r)) => {
+                    Some(Value::Number(l + r))
+                }
+                (Value::String(l), Value::String(r)) => {
+                    Some(Value::String(l + &r))
+                }
                 _ => None,
             },
             BinOp::Sub => match (left, right) {
-                (Value::Number(l), Value::Number(r)) => Some(Value::Number(l - r)),
+                (Value::Number(l), Value::Number(r)) => {
+                    Some(Value::Number(l - r))
+                }
                 _ => None,
             },
             BinOp::Mul => match (left, right) {
-                (Value::Number(l), Value::Number(r)) => Some(Value::Number(l * r)),
+                (Value::Number(l), Value::Number(r)) => {
+                    Some(Value::Number(l * r))
+                }
                 _ => None,
             },
             BinOp::Rem => match (left, right) {
-                (Value::Number(l), Value::Number(r)) => Some(Value::Number(l % r)),
+                (Value::Number(l), Value::Number(r)) => {
+                    Some(Value::Number(l % r))
+                }
                 _ => None,
             },
             BinOp::Div => match (left, right) {
-                (Value::Number(l), Value::Number(r)) => Some(Value::Number(l / r)),
+                (Value::Number(l), Value::Number(r)) => {
+                    Some(Value::Number(l / r))
+                }
                 _ => None,
             },
             BinOp::Greater => match (left, right) {
-                (Value::Number(l), Value::Number(r)) => Some(Value::Bool(l > r)),
+                (Value::Number(l), Value::Number(r)) => {
+                    Some(Value::Bool(l > r))
+                }
                 _ => None,
             },
             BinOp::GreaterEqual => match (left, right) {
-                (Value::Number(l), Value::Number(r)) => Some(Value::Bool(l >= r)),
+                (Value::Number(l), Value::Number(r)) => {
+                    Some(Value::Bool(l >= r))
+                }
                 _ => None,
             },
             BinOp::Less => match (left, right) {
-                (Value::Number(l), Value::Number(r)) => Some(Value::Bool(l < r)),
+                (Value::Number(l), Value::Number(r)) => {
+                    Some(Value::Bool(l < r))
+                }
                 _ => None,
             },
             BinOp::LessEqual => match (left, right) {
-                (Value::Number(l), Value::Number(r)) => Some(Value::Bool(l <= r)),
+                (Value::Number(l), Value::Number(r)) => {
+                    Some(Value::Bool(l <= r))
+                }
                 _ => None,
             },
             BinOp::Equal => Some(Value::Bool(left == right)),

@@ -209,6 +209,7 @@ name = "rikulox-treewalk"
 version = "0.1.0"
 dependencies = [
  "rikulox-ast",
+ "rikulox-gc",
  "rikulox-runtime",
 ]
 

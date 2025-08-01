@@ -151,7 +151,10 @@ where
         }
     }
 
-    fn print_statement(&mut self, print_span: Span) -> Result<Stmt, ParseError> {
+    fn print_statement(
+        &mut self,
+        print_span: Span,
+    ) -> Result<Stmt, ParseError> {
         let expr = self.expression()?;
         let semi = self.consume(&TokenKind::Semicolon)?;
         Ok(Stmt {
@@ -249,7 +252,10 @@ where
         Ok(body)
     }
 
-    fn while_statement(&mut self, while_span: Span) -> Result<Stmt, ParseError> {
+    fn while_statement(
+        &mut self,
+        while_span: Span,
+    ) -> Result<Stmt, ParseError> {
         self.consume(&TokenKind::LParen)?;
         let condition = self.expression()?;
         self.consume(&TokenKind::RParen)?;
@@ -300,7 +306,10 @@ where
         })
     }
 
-    fn block_statement(&mut self, l_brace_span: Span) -> Result<Stmt, ParseError> {
+    fn block_statement(
+        &mut self,
+        l_brace_span: Span,
+    ) -> Result<Stmt, ParseError> {
         let (stmts, r_brace_span) = self.block()?;
         Ok(Stmt {
             kind: StmtKind::Block(stmts),
@@ -421,7 +430,10 @@ where
         let expr_span = expr.span;
 
         while let Some(token) = self.peek()
-            && matches!(token.kind, TokenKind::EqualEqual | TokenKind::BangEqual)
+            && matches!(
+                token.kind,
+                TokenKind::EqualEqual | TokenKind::BangEqual
+            )
         {
             let token = self.advance().unwrap();
 
@@ -579,7 +591,10 @@ where
         Ok(expr)
     }
 
-    fn arguments(&mut self, l_paren_span: Span) -> Result<(Vec<Expr>, Span), ParseError> {
+    fn arguments(
+        &mut self,
+        l_paren_span: Span,
+    ) -> Result<(Vec<Expr>, Span), ParseError> {
         let mut args = Vec::new();
 
         if let Some(token) = self.peek()
@@ -596,7 +611,8 @@ where
             }
         }
 
-        let r_paren = self.advance_or_err(ExpectedItem::Token(TokenKind::RParen))?;
+        let r_paren =
+            self.advance_or_err(ExpectedItem::Token(TokenKind::RParen))?;
 
         if args.len() >= MAX_ARGS {
             return Err(ParseError {
@@ -693,8 +709,11 @@ where
     fn check_kind(&mut self, kind: &TokenKind) -> bool {
         self.peek()
             .map(|token| match token.kind {
-                TokenKind::Number(_) | TokenKind::String(_) | TokenKind::Identifier(_) => {
-                    std::mem::discriminant(&token.kind) == std::mem::discriminant(kind)
+                TokenKind::Number(_)
+                | TokenKind::String(_)
+                | TokenKind::Identifier(_) => {
+                    std::mem::discriminant(&token.kind)
+                        == std::mem::discriminant(kind)
                 }
 
                 _ => &token.kind == kind,
@@ -706,7 +725,10 @@ where
         self.tokens.peek()
     }
 
-    fn peek_or_err(&mut self, expected: ExpectedItem) -> Result<&Token, ParseError> {
+    fn peek_or_err(
+        &mut self,
+        expected: ExpectedItem,
+    ) -> Result<&Token, ParseError> {
         let eof_span = self.eof_span;
         self.peek().ok_or(ParseError {
             kind: ParseErrorKind::UnexpectedEof { expected },
@@ -727,7 +749,10 @@ where
         self.tokens.next()
     }
 
-    fn advance_or_err(&mut self, expected: ExpectedItem) -> Result<Token, ParseError> {
+    fn advance_or_err(
+        &mut self,
+        expected: ExpectedItem,
+    ) -> Result<Token, ParseError> {
         let Some(token) = self.advance() else {
             return Err(ParseError {
                 kind: ParseErrorKind::UnexpectedEof { expected },

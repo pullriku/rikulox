@@ -125,10 +125,12 @@ impl<'src> Scanner<'src> {
                 Ok(token) => token,
                 Err(error) => return Some(Err(error)),
             },
-            c if unicode_ident::is_xid_start(c) || c == '_' => match self.identifier() {
-                Ok(token) => token,
-                Err(error) => return Some(Err(error)),
-            },
+            c if unicode_ident::is_xid_start(c) || c == '_' => {
+                match self.identifier() {
+                    Ok(token) => token,
+                    Err(error) => return Some(Err(error)),
+                }
+            }
             _ => {
                 return Some(Err(
                     self.make_error(ScanErrorKind::UnexpectedCharacter(char))
@@ -195,13 +197,16 @@ impl<'src> Scanner<'src> {
     }
 
     fn is_comment(&mut self) -> bool {
-        self.peek()
-            .is_some_and(|c| c == '/' && self.peek_next().is_some_and(|c| c == '/'))
+        self.peek().is_some_and(|c| {
+            c == '/' && self.peek_next().is_some_and(|c| c == '/')
+        })
     }
 
     /// Skips whitespace and comments.
     fn skip(&mut self) {
-        while self.peek().is_some_and(|c| c.is_ascii_whitespace()) || self.is_comment() {
+        while self.peek().is_some_and(|c| c.is_ascii_whitespace())
+            || self.is_comment()
+        {
             self.advance();
         }
     }

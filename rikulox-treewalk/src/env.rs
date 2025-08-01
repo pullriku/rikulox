@@ -29,14 +29,22 @@ impl Environment {
         self.values.insert(name, value);
     }
 
-    pub fn assign(&mut self, name: &str, value: Value) -> Result<(), RuntimeErrorKind> {
+    pub fn assign(
+        &mut self,
+        name: &str,
+        value: Value,
+    ) -> Result<(), RuntimeErrorKind> {
         match (self.values.get_mut(name), &self.enclosing) {
             (Some(var), _) => {
                 *var = value;
                 Ok(())
             }
-            (None, Some(enclosing)) => enclosing.borrow_mut().assign(name, value),
-            (None, None) => Err(RuntimeErrorKind::UndefinedVariable(name.to_string())),
+            (None, Some(enclosing)) => {
+                enclosing.borrow_mut().assign(name, value)
+            }
+            (None, None) => {
+                Err(RuntimeErrorKind::UndefinedVariable(name.to_string()))
+            }
         }
     }
 
@@ -44,7 +52,9 @@ impl Environment {
         match (self.values.get(name), &self.enclosing) {
             (Some(var), _) => Ok(var.clone()),
             (None, Some(enclosing)) => enclosing.borrow().get(name),
-            (None, None) => Err(RuntimeErrorKind::UndefinedVariable(name.to_string())),
+            (None, None) => {
+                Err(RuntimeErrorKind::UndefinedVariable(name.to_string()))
+            }
         }
     }
 }

@@ -48,8 +48,10 @@ impl Runner {
             return Ok(());
         }
 
-        let mut interp =
-            TreeWalkInterpreter::new(mem::take(&mut self.string_interner), Rc::clone(&self.env));
+        let mut interp = TreeWalkInterpreter::new(
+            mem::take(&mut self.string_interner),
+            Rc::clone(&self.env),
+        );
 
         if let Err(error) = interp.interpret(ast) {
             println!("{error:?}");

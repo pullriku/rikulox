@@ -5,14 +5,14 @@ use crate::{
     token::{Keyword, TokenKind},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
     pub id: NodeId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
     Binary {
         left: Box<Expr>,
@@ -41,12 +41,12 @@ pub enum ExprKind {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier {
     pub symbol: InternSymbol,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Number(f64),
     String(InternSymbol),
@@ -54,7 +54,7 @@ pub enum Literal {
     Bool(bool),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnaryOp {
     Minus,
     Bang,
@@ -66,7 +66,7 @@ bijective_enum_map::injective_enum_map! {
     Bang <=> TokenKind::Bang,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BinOp {
     Add,
     Sub,
@@ -96,7 +96,7 @@ bijective_enum_map::injective_enum_map! {
     GreaterEqual <=> TokenKind::GreaterEqual,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LogicalOp {
     And,
     Or,
