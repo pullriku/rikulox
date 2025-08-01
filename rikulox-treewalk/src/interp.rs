@@ -3,45 +3,36 @@ use std::{cell::RefCell, mem, rc::Rc};
 use rikulox_ast::{
     expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
     stmt::{Stmt, StmtKind},
-    string::Interner,
 };
 use rikulox_runtime::error::{RuntimeError, RuntimeErrorKind};
 
 use crate::{env::Environment, value::Value};
 
-pub struct TreeWalkInterpreter {
-    string_interner: Interner,
-    env: Rc<RefCell<Environment>>,
+pub struct TreeWalkInterpreter<'src> {
+    env: Rc<RefCell<Environment<'src>>>,
 }
 
-impl TreeWalkInterpreter {
-    pub fn new(
-        string_interner: Interner,
-        env: Rc<RefCell<Environment>>,
-    ) -> Self {
-        Self {
-            string_interner,
-            env,
-        }
+impl<'src> TreeWalkInterpreter<'src> {
+    pub fn new(env: Rc<RefCell<Environment<'src>>>) -> Self {
+        Self { env }
     }
 
-    pub fn into_interner(self) -> Interner {
-        self.string_interner
-    }
-
-    pub fn interpret(&mut self, ast: Vec<Stmt>) -> Result<(), RuntimeError> {
+    pub fn interpret(
+        &mut self,
+        ast: Vec<Stmt<'src>>,
+    ) -> Result<(), RuntimeError<'src>> {
         for stmt in ast {
             self.exec(&stmt)?
         }
         Ok(())
     }
 
-    fn exec(&mut self, stmt: &Stmt) -> Result<(), RuntimeError> {
+    fn exec(&mut self, stmt: &Stmt<'src>) -> Result<(), RuntimeError<'src>> {
         match &stmt.kind {
             StmtKind::Expression(expr) => {
                 self.eval(expr)?;
             }
-            StmtKind::Print(expr) => println!("{}", self.eval(expr)?),
+            StmtKind::Print(_expr) => todo!(),
             StmtKind::Var {
                 name: Identifier { symbol },
                 init,
@@ -50,10 +41,7 @@ impl TreeWalkInterpreter {
                     Some(expr) => self.eval(expr)?,
                     None => Value::Nil,
                 };
-                self.env.borrow_mut().define(
-                    self.string_interner.resolve(*symbol).unwrap().to_string(),
-                    value,
-                );
+                self.env.borrow_mut().define(symbol, value);
             }
             StmtKind::Block(stmts) => self.exec_block(
                 stmts,
@@ -77,18 +65,20 @@ impl TreeWalkInterpreter {
                     self.exec(body.as_ref())?
                 }
             }
+
+            StmtKind::Function(_decl) => todo!(),
         };
         Ok(())
     }
 
     fn exec_block(
         &mut self,
-        stmts: &[Stmt],
-        mut env: Rc<RefCell<Environment>>,
-    ) -> Result<(), RuntimeError> {
+        stmts: &[Stmt<'src>],
+        mut env: Rc<RefCell<Environment<'src>>>,
+    ) -> Result<(), RuntimeError<'src>> {
         mem::swap(&mut self.env, &mut env);
 
-        let result: Result<(), RuntimeError> = (|| {
+        let result: Result<(), RuntimeError<'src>> = (|| {
             for stmt in stmts {
                 self.exec(stmt)?;
             }
@@ -100,7 +90,10 @@ impl TreeWalkInterpreter {
         result
     }
 
-    fn eval(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
+    fn eval(
+        &mut self,
+        expr: &Expr<'src>,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
         let object = match &expr.kind {
             ExprKind::Binary { left, op, right } => {
                 self.binary_expr(left.as_ref(), op, right.as_ref(), expr)?
@@ -123,34 +116,21 @@ impl TreeWalkInterpreter {
             ExprKind::Grouping(expr) => self.eval(expr.as_ref())?,
             ExprKind::Literal(literal) => match literal {
                 Literal::Number(number) => Value::Number(*number),
-                Literal::String(symbol_u32) => Value::String(
-                    self.string_interner
-                        .resolve(*symbol_u32)
-                        .unwrap()
-                        .to_string(),
-                ),
+                Literal::String(_string) => todo!(),
                 Literal::Nil => Value::Nil,
                 Literal::Bool(bool) => Value::Bool(*bool),
             },
             ExprKind::Variable(identifier) => {
-                let name = self
-                    .string_interner
-                    .resolve(identifier.symbol)
-                    .unwrap()
-                    .to_string();
-                self.env.borrow().get(&name).map_err(|kind| RuntimeError {
+                let name = identifier.symbol;
+                self.env.borrow().get(name).map_err(|kind| RuntimeError {
                     kind,
                     span: expr.span,
                 })?
             }
             ExprKind::Assign { name, value } => {
                 let value = self.eval(value.as_ref())?;
-                let name = self
-                    .string_interner
-                    .resolve(name.symbol)
-                    .unwrap()
-                    .to_string();
-                self.env.borrow_mut().assign(&name, value.clone()).map_err(
+                let name = name.symbol;
+                self.env.borrow_mut().assign(name, value.clone()).map_err(
                     |kind| RuntimeError {
                         kind,
                         span: expr.span,
@@ -176,6 +156,7 @@ impl TreeWalkInterpreter {
 
                 self.eval(right.as_ref())?
             }
+            ExprKind::Call { callee: _, args: _ } => todo!(),
         };
 
         Ok(object)
@@ -183,20 +164,18 @@ impl TreeWalkInterpreter {
 
     fn binary_expr(
         &mut self,
-        left: &Expr,
+        left: &Expr<'src>,
         op: &BinOp,
-        right: &Expr,
-        expr: &Expr,
-    ) -> Result<Value, RuntimeError> {
+        right: &Expr<'src>,
+        expr: &Expr<'src>,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
         let (left, right) = (self.eval(left)?, self.eval(right)?);
         let object_opt = match op {
             BinOp::Add => match (left, right) {
                 (Value::Number(l), Value::Number(r)) => {
                     Some(Value::Number(l + r))
                 }
-                (Value::String(l), Value::String(r)) => {
-                    Some(Value::String(l + &r))
-                }
+                // TODO: Add string concatenation
                 _ => None,
             },
             BinOp::Sub => match (left, right) {

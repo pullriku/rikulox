@@ -1,13 +1,13 @@
 use rikulox_ast::{expr::Expr, span::Span};
 
 #[derive(Debug, Clone)]
-pub struct RuntimeError {
-    pub kind: RuntimeErrorKind,
+pub struct RuntimeError<'src> {
+    pub kind: RuntimeErrorKind<'src>,
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
-pub enum RuntimeErrorKind {
-    TypeError(Expr),
+pub enum RuntimeErrorKind<'src> {
+    TypeError(Expr<'src>),
     UndefinedVariable(String),
 }

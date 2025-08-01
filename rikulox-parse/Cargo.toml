@@ -8,4 +8,3 @@ readme.workspace = true
 [dependencies]
 rikulox-ast = { version = "0.1.0", path = "../rikulox-ast" }
 rikulox-lex = { version = "0.1.0", path = "../rikulox-lex" }
-string-interner = "0.19.0"

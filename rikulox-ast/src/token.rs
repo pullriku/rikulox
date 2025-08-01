@@ -1,13 +1,13 @@
-use crate::{span::Span, string::InternSymbol};
+use crate::span::Span;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Token {
-    pub kind: TokenKind,
+pub struct Token<'src> {
+    pub kind: TokenKind<'src>,
     pub span: Span,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum TokenKind {
+pub enum TokenKind<'src> {
     LParen,
     RParen,
     LBrace,
@@ -28,8 +28,8 @@ pub enum TokenKind {
     GreaterEqual,
     Less,
     LessEqual,
-    Identifier(InternSymbol),
-    String(InternSymbol),
+    Identifier(&'src str),
+    String(&'src str),
     Number(f64),
     Keyword(Keyword),
 }

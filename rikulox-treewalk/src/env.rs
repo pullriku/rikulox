@@ -5,12 +5,12 @@ use rikulox_runtime::error::RuntimeErrorKind;
 use crate::value::Value;
 
 #[derive(Debug, Clone)]
-pub struct Environment {
-    enclosing: Option<Rc<RefCell<Environment>>>,
-    values: HashMap<String, Value>,
+pub struct Environment<'src> {
+    enclosing: Option<Rc<RefCell<Environment<'src>>>>,
+    values: HashMap<&'src str, Value<'src>>,
 }
 
-impl Environment {
+impl<'src> Environment<'src> {
     pub fn new() -> Self {
         Environment {
             enclosing: None,
@@ -18,22 +18,22 @@ impl Environment {
         }
     }
 
-    pub fn with_enclosing(enclosing: Rc<RefCell<Environment>>) -> Self {
+    pub fn with_enclosing(enclosing: Rc<RefCell<Environment<'src>>>) -> Self {
         Environment {
             enclosing: Some(enclosing),
             values: HashMap::new(),
         }
     }
 
-    pub fn define(&mut self, name: String, value: Value) {
+    pub fn define(&mut self, name: &'src str, value: Value<'src>) {
         self.values.insert(name, value);
     }
 
     pub fn assign(
         &mut self,
         name: &str,
-        value: Value,
-    ) -> Result<(), RuntimeErrorKind> {
+        value: Value<'src>,
+    ) -> Result<(), RuntimeErrorKind<'src>> {
         match (self.values.get_mut(name), &self.enclosing) {
             (Some(var), _) => {
                 *var = value;
@@ -48,7 +48,10 @@ impl Environment {
         }
     }
 
-    pub fn get(&self, name: &str) -> Result<Value, RuntimeErrorKind> {
+    pub fn get(
+        &self,
+        name: &str,
+    ) -> Result<Value<'src>, RuntimeErrorKind<'src>> {
         match (self.values.get(name), &self.enclosing) {
             (Some(var), _) => Ok(var.clone()),
             (None, Some(enclosing)) => enclosing.borrow().get(name),
@@ -59,7 +62,7 @@ impl Environment {
     }
 }
 
-impl Default for Environment {
+impl<'src> Default for Environment<'src> {
     fn default() -> Self {
         Self::new()
     }

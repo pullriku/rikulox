@@ -5,36 +5,36 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Stmt {
-    pub kind: StmtKind,
+pub struct Stmt<'src> {
+    pub kind: StmtKind<'src>,
     pub span: Span,
     pub id: NodeId,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum StmtKind {
-    Expression(Expr),
-    Print(Expr),
+pub enum StmtKind<'src> {
+    Expression(Expr<'src>),
+    Print(Expr<'src>),
     Var {
-        name: Identifier,
-        init: Option<Expr>,
+        name: Identifier<'src>,
+        init: Option<Expr<'src>>,
     },
-    Block(Vec<Stmt>),
+    Block(Vec<Stmt<'src>>),
     If {
-        condition: Expr,
-        then_branch: Box<Stmt>,
-        else_branch: Option<Box<Stmt>>,
+        condition: Expr<'src>,
+        then_branch: Box<Stmt<'src>>,
+        else_branch: Option<Box<Stmt<'src>>>,
     },
     While {
-        condition: Expr,
-        body: Box<Stmt>,
+        condition: Expr<'src>,
+        body: Box<Stmt<'src>>,
     },
-    Function(FunctionDecl),
+    Function(FunctionDecl<'src>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FunctionDecl {
-    pub name: Identifier,
-    pub params: Vec<Identifier>,
-    pub body: Vec<Stmt>,
+pub struct FunctionDecl<'src> {
+    pub name: Identifier<'src>,
+    pub params: Vec<Identifier<'src>>,
+    pub body: Vec<Stmt<'src>>,
 }

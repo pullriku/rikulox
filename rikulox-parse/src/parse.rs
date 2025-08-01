@@ -12,18 +12,18 @@ use crate::error::{ExpectedItem, ParseError, ParseErrorKind};
 
 pub const MAX_ARGS: usize = u8::MAX as usize;
 
-pub struct Parser<I>
+pub struct Parser<'src, I>
 where
-    I: Iterator<Item = Token>,
+    I: Iterator<Item = Token<'src>>,
 {
     tokens: Peekable<I>,
     eof_span: Span,
     id_gen: IdGen,
 }
 
-impl<I> Parser<I>
+impl<'src, I> Parser<'src, I>
 where
-    I: Iterator<Item = Token>,
+    I: Iterator<Item = Token<'src>>,
 {
     pub fn new(tokens: Peekable<I>, eof_span: Span) -> Self {
         Self {
@@ -33,7 +33,7 @@ where
         }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, ParseError> {
+    pub fn parse(&mut self) -> Result<Vec<Stmt<'src>>, ParseError<'src>> {
         let mut stmts = Vec::new();
         while self.peek().is_some() {
             stmts.push(self.declaration()?);
@@ -41,7 +41,7 @@ where
         Ok(stmts)
     }
 
-    fn declaration(&mut self) -> Result<Stmt, ParseError> {
+    fn declaration(&mut self) -> Result<Stmt<'src>, ParseError<'src>> {
         let &Token { kind, .. } = self.peek_or_err(ExpectedItem::Stmt)?;
         match kind {
             TokenKind::Keyword(Keyword::Var) => {
@@ -52,7 +52,10 @@ where
         }
     }
 
-    fn var_decl(&mut self, var_span: Span) -> Result<Stmt, ParseError> {
+    fn var_decl(
+        &mut self,
+        var_span: Span,
+    ) -> Result<Stmt<'src>, ParseError<'src>> {
         let name_symbol = match self.peek_or_err(ExpectedItem::Ident)? {
             &Token {
                 kind: TokenKind::Identifier(name),
@@ -122,7 +125,7 @@ where
         })
     }
 
-    fn statement(&mut self) -> Result<Stmt, ParseError> {
+    fn statement(&mut self) -> Result<Stmt<'src>, ParseError<'src>> {
         let Token { kind, .. } = self.peek_or_err(ExpectedItem::Stmt)?;
         let kind = *kind;
 
@@ -154,7 +157,7 @@ where
     fn print_statement(
         &mut self,
         print_span: Span,
-    ) -> Result<Stmt, ParseError> {
+    ) -> Result<Stmt<'src>, ParseError<'src>> {
         let expr = self.expression()?;
         let semi = self.consume(&TokenKind::Semicolon)?;
         Ok(Stmt {
@@ -164,7 +167,10 @@ where
         })
     }
 
-    fn for_statement(&mut self, for_span: Span) -> Result<Stmt, ParseError> {
+    fn for_statement(
+        &mut self,
+        for_span: Span,
+    ) -> Result<Stmt<'src>, ParseError<'src>> {
         self.consume(&TokenKind::LParen)?;
 
         let init = match self.peek() {
@@ -255,7 +261,7 @@ where
     fn while_statement(
         &mut self,
         while_span: Span,
-    ) -> Result<Stmt, ParseError> {
+    ) -> Result<Stmt<'src>, ParseError<'src>> {
         self.consume(&TokenKind::LParen)?;
         let condition = self.expression()?;
         self.consume(&TokenKind::RParen)?;
@@ -273,7 +279,10 @@ where
         })
     }
 
-    fn if_statement(&mut self, if_span: Span) -> Result<Stmt, ParseError> {
+    fn if_statement(
+        &mut self,
+        if_span: Span,
+    ) -> Result<Stmt<'src>, ParseError<'src>> {
         self.consume(&TokenKind::LParen)?;
         let condition = self.expression()?;
         self.consume(&TokenKind::RParen)?;
@@ -309,7 +318,7 @@ where
     fn block_statement(
         &mut self,
         l_brace_span: Span,
-    ) -> Result<Stmt, ParseError> {
+    ) -> Result<Stmt<'src>, ParseError<'src>> {
         let (stmts, r_brace_span) = self.block()?;
         Ok(Stmt {
             kind: StmtKind::Block(stmts),
@@ -318,7 +327,7 @@ where
         })
     }
 
-    fn block(&mut self) -> Result<(Vec<Stmt>, Span), ParseError> {
+    fn block(&mut self) -> Result<(Vec<Stmt<'src>>, Span), ParseError<'src>> {
         let mut stmts = Vec::new();
 
         while let Some(token) = self.peek()
@@ -332,7 +341,7 @@ where
         Ok((stmts, r_brace.span))
     }
 
-    fn expression_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn expression_statement(&mut self) -> Result<Stmt<'src>, ParseError<'src>> {
         let expr = self.expression()?;
         let expr_span = expr.span;
         let semi = self.consume(&TokenKind::Semicolon)?;
@@ -343,11 +352,11 @@ where
         })
     }
 
-    fn expression(&mut self) -> Result<Expr, ParseError> {
+    fn expression(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         self.assignment()
     }
 
-    fn assignment(&mut self) -> Result<Expr, ParseError> {
+    fn assignment(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         let expr = self.or()?;
 
         if let Some(token) = self.peek()
@@ -379,7 +388,7 @@ where
         }
     }
 
-    fn or(&mut self) -> Result<Expr, ParseError> {
+    fn or(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         let mut expr = self.and()?;
         let expr_span = expr.span;
 
@@ -402,7 +411,7 @@ where
         Ok(expr)
     }
 
-    fn and(&mut self) -> Result<Expr, ParseError> {
+    fn and(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         let mut expr = self.equality()?;
         let expr_span = expr.span;
 
@@ -425,7 +434,7 @@ where
         Ok(expr)
     }
 
-    fn equality(&mut self) -> Result<Expr, ParseError> {
+    fn equality(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         let mut expr = self.comparison()?;
         let expr_span = expr.span;
 
@@ -456,7 +465,7 @@ where
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> Result<Expr, ParseError> {
+    fn comparison(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         let mut expr = self.term()?;
         let expr_span = expr.span;
 
@@ -490,7 +499,7 @@ where
         Ok(expr)
     }
 
-    fn term(&mut self) -> Result<Expr, ParseError> {
+    fn term(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         let mut expr = self.factor()?;
         let expr_span = expr.span;
 
@@ -518,7 +527,7 @@ where
         Ok(expr)
     }
 
-    fn factor(&mut self) -> Result<Expr, ParseError> {
+    fn factor(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         let mut expr = self.unary()?;
         let expr_span = expr.span;
 
@@ -546,7 +555,7 @@ where
         Ok(expr)
     }
 
-    fn unary(&mut self) -> Result<Expr, ParseError> {
+    fn unary(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         let Token { kind, .. } = self.peek_or_err(ExpectedItem::Expr)?;
         let kind = *kind;
 
@@ -568,7 +577,7 @@ where
         }
     }
 
-    fn call(&mut self) -> Result<Expr, ParseError> {
+    fn call(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         let mut expr = self.primary()?;
         let expr_span = expr.span;
 
@@ -594,7 +603,7 @@ where
     fn arguments(
         &mut self,
         l_paren_span: Span,
-    ) -> Result<(Vec<Expr>, Span), ParseError> {
+    ) -> Result<(Vec<Expr<'src>>, Span), ParseError<'src>> {
         let mut args = Vec::new();
 
         if let Some(token) = self.peek()
@@ -624,7 +633,7 @@ where
         Ok((args, r_paren.span))
     }
 
-    fn primary(&mut self) -> Result<Expr, ParseError> {
+    fn primary(&mut self) -> Result<Expr<'src>, ParseError<'src>> {
         let token = self.advance_or_err(ExpectedItem::Expr)?;
 
         let expr = match token.kind {
@@ -692,7 +701,10 @@ where
         Ok(expr)
     }
 
-    fn consume(&mut self, kind: &TokenKind) -> Result<Token, ParseError> {
+    fn consume(
+        &mut self,
+        kind: &TokenKind<'src>,
+    ) -> Result<Token<'src>, ParseError<'src>> {
         if self.check_kind(kind) {
             return self.advance().ok_or_else(|| unreachable!());
         }
@@ -721,14 +733,14 @@ where
             .unwrap_or(false)
     }
 
-    fn peek(&mut self) -> Option<&Token> {
+    fn peek(&mut self) -> Option<&Token<'src>> {
         self.tokens.peek()
     }
 
     fn peek_or_err(
         &mut self,
-        expected: ExpectedItem,
-    ) -> Result<&Token, ParseError> {
+        expected: ExpectedItem<'src>,
+    ) -> Result<&Token<'src>, ParseError<'src>> {
         let eof_span = self.eof_span;
         self.peek().ok_or(ParseError {
             kind: ParseErrorKind::UnexpectedEof { expected },
@@ -745,14 +757,14 @@ where
         }
     }
 
-    fn advance(&mut self) -> Option<Token> {
+    fn advance(&mut self) -> Option<Token<'src>> {
         self.tokens.next()
     }
 
     fn advance_or_err(
         &mut self,
-        expected: ExpectedItem,
-    ) -> Result<Token, ParseError> {
+        expected: ExpectedItem<'src>,
+    ) -> Result<Token<'src>, ParseError<'src>> {
         let Some(token) = self.advance() else {
             return Err(ParseError {
                 kind: ParseErrorKind::UnexpectedEof { expected },

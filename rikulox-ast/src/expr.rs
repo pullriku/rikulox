@@ -1,55 +1,54 @@
 use crate::{
     id::NodeId,
     span::Span,
-    string::InternSymbol,
     token::{Keyword, TokenKind},
 };
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Expr {
-    pub kind: ExprKind,
+pub struct Expr<'src> {
+    pub kind: ExprKind<'src>,
     pub span: Span,
     pub id: NodeId,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ExprKind {
+pub enum ExprKind<'src> {
     Binary {
-        left: Box<Expr>,
+        left: Box<Expr<'src>>,
         op: BinOp,
-        right: Box<Expr>,
+        right: Box<Expr<'src>>,
     },
     Unary {
         op: UnaryOp,
-        right: Box<Expr>,
+        right: Box<Expr<'src>>,
     },
-    Grouping(Box<Expr>),
-    Literal(Literal),
-    Variable(Identifier),
+    Grouping(Box<Expr<'src>>),
+    Literal(Literal<'src>),
+    Variable(Identifier<'src>),
     Assign {
-        name: Identifier,
-        value: Box<Expr>,
+        name: Identifier<'src>,
+        value: Box<Expr<'src>>,
     },
     Logical {
-        left: Box<Expr>,
+        left: Box<Expr<'src>>,
         op: LogicalOp,
-        right: Box<Expr>,
+        right: Box<Expr<'src>>,
     },
     Call {
-        callee: Box<Expr>,
-        args: Vec<Expr>,
+        callee: Box<Expr<'src>>,
+        args: Vec<Expr<'src>>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Identifier {
-    pub symbol: InternSymbol,
+pub struct Identifier<'src> {
+    pub symbol: &'src str,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
+pub enum Literal<'src> {
     Number(f64),
-    String(InternSymbol),
+    String(&'src str),
     Nil,
     Bool(bool),
 }
@@ -61,7 +60,7 @@ pub enum UnaryOp {
 }
 
 bijective_enum_map::injective_enum_map! {
-    UnaryOp, TokenKind,
+    UnaryOp, TokenKind<'_>,
     Minus <=> TokenKind::Minus,
     Bang <=> TokenKind::Bang,
 }
@@ -82,7 +81,7 @@ pub enum BinOp {
 }
 
 bijective_enum_map::injective_enum_map! {
-    BinOp, TokenKind,
+    BinOp, TokenKind<'_>,
     Add <=> TokenKind::Plus,
     Sub <=> TokenKind::Minus,
     Mul <=> TokenKind::Star,
@@ -103,7 +102,7 @@ pub enum LogicalOp {
 }
 
 bijective_enum_map::injective_enum_map! {
-    LogicalOp, TokenKind,
+    LogicalOp, TokenKind<'_>,
     And <=> TokenKind::Keyword(Keyword::And),
     Or <=> TokenKind::Keyword(Keyword::Or),
 }
