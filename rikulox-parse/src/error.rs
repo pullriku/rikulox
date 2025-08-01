@@ -1,29 +1,29 @@
 use rikulox_ast::{span::Span, token::TokenKind};
 
 #[derive(Debug, Clone)]
-pub struct ParseError {
-    pub kind: ParseErrorKind,
+pub struct ParseError<'src> {
+    pub kind: ParseErrorKind<'src>,
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
-pub enum ParseErrorKind {
+pub enum ParseErrorKind<'src> {
     UnexpectedToken {
-        expected: ExpectedItem,
-        found: TokenKind,
+        expected: ExpectedItem<'src>,
+        found: TokenKind<'src>,
     },
     UnexpectedEof {
-        expected: ExpectedItem,
+        expected: ExpectedItem<'src>,
     },
     RParenNotFound,
     TooManyArguments,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum ExpectedItem {
+pub enum ExpectedItem<'src> {
     Stmt,
     Expr,
     Ident,
-    Token(TokenKind),
+    Token(TokenKind<'src>),
     Unknown,
 }

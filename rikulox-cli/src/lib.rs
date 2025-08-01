@@ -1,7 +1,6 @@
 use std::{
     cell::RefCell,
-    io::{self, BufRead, BufReader, Write},
-    mem,
+    io::{self, Write},
     path::Path,
     rc::Rc,
 };
@@ -9,21 +8,19 @@ use std::{
 use rikulox_lex::scan::{ScanTokens, Scanner};
 use rikulox_parse::parse::Parser;
 use rikulox_treewalk::{env::Environment, interp::TreeWalkInterpreter};
-use string_interner::{DefaultBackend, StringInterner};
 
-struct Runner {
-    string_interner: StringInterner<DefaultBackend>,
-    env: Rc<RefCell<Environment>>,
+struct Runner<'src> {
+    env: Rc<RefCell<Environment<'src>>>,
 }
 
-impl Runner {
-    fn run(&mut self, source: &str) -> io::Result<()> {
+impl<'src> Runner<'src> {
+    fn run(&mut self, source: &'src str) -> io::Result<()> {
         let ScanTokens {
             tokens,
             eof_span,
             errors: lex_errors,
         } = {
-            let mut lexer = Scanner::new(source, &mut self.string_interner);
+            let mut lexer: Scanner<'src> = Scanner::new(source);
             lexer.scan_tokens()
         };
 
@@ -48,17 +45,12 @@ impl Runner {
             return Ok(());
         }
 
-        let mut interp = TreeWalkInterpreter::new(
-            mem::take(&mut self.string_interner),
-            Rc::clone(&self.env),
-        );
+        let mut interp: TreeWalkInterpreter<'src> =
+            TreeWalkInterpreter::new(Rc::clone(&self.env));
 
         if let Err(error) = interp.interpret(ast) {
             println!("{error:?}");
         };
-
-        let string_interner = interp.into_interner();
-        self.string_interner = string_interner;
 
         Ok(())
     }
@@ -69,7 +61,6 @@ pub fn run_file(path: &Path) -> io::Result<()> {
 
     let mut runner = Runner {
         env: Rc::new(RefCell::new(Environment::default())),
-        string_interner: StringInterner::default(),
     };
 
     runner.run(&source)?;
@@ -78,19 +69,16 @@ pub fn run_file(path: &Path) -> io::Result<()> {
 }
 
 pub fn run_repl() -> io::Result<()> {
-    let mut reader = BufReader::new(io::stdin());
-    let mut line = String::new();
     let mut runner = Runner {
         env: Rc::new(RefCell::new(Environment::default())),
-        string_interner: StringInterner::default(),
     };
 
     loop {
-        line.clear();
+        let mut line = String::new();
         print!("> ");
-        io::stdout().flush().unwrap();
+        io::stdout().flush()?;
 
-        let read_result = reader.read_line(&mut line);
+        let read_result = io::stdin().read_line(&mut line);
 
         match read_result {
             Ok(0) => break,
@@ -98,7 +86,7 @@ pub fn run_repl() -> io::Result<()> {
             Err(e) => return Err(e),
         }
 
-        runner.run(&line)?;
+        runner.run(line.leak())?;
     }
 
     println!();

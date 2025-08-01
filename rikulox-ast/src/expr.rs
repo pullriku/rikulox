@@ -1,7 +1,6 @@
 use crate::{
     id::NodeId,
     span::Span,
-    string::InternSymbol,
     token::{Keyword, TokenKind},
 };
 
@@ -24,7 +23,7 @@ pub enum ExprKind<'src> {
         right: Box<Expr<'src>>,
     },
     Grouping(Box<Expr<'src>>),
-    Literal(Literal),
+    Literal(Literal<'src>),
     Variable(Identifier<'src>),
     Assign {
         name: Identifier<'src>,
@@ -47,9 +46,9 @@ pub struct Identifier<'src> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
+pub enum Literal<'src> {
     Number(f64),
-    String(InternSymbol),
+    String(&'src str),
     Nil,
     Bool(bool),
 }

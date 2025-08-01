@@ -1,30 +1,40 @@
 use std::fmt::Display;
 
-use rikulox_ast::stmt::{FunctionDecl, Stmt, StmtKind};
+use rikulox_ast::stmt::FunctionDecl;
 use rikulox_gc::trace::Trace;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Object {
+pub enum Object<'src> {
     String(String),
-    Function {
-        declaration: FunctionDecl,
-    }
+    Function { declaration: FunctionDecl<'src> },
 }
 
-impl Trace for Object {
+impl<'src> Trace for Object<'src> {
     fn trace(&self, tracer: &mut rikulox_gc::trace::Tracer<Self>)
-        where
-            Self: Sized {
-        todo!()
+    where
+        Self: Sized,
+    {
+        todo!("{:?}", tracer)
     }
 }
 
-impl Display for Object {
+impl<'src> Display for Object<'src> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Object::String(s) => write!(f, "{}", s),
-            Object::Function(FunctionDecl { name, params, body }) => {
-                write!(f, "fn {}({})", name, params.join(", "))
+            Object::String(s) => write!(f, "{s}"),
+            Object::Function {
+                declaration: FunctionDecl { name, params, .. },
+            } => {
+                write!(
+                    f,
+                    "fn {}({})",
+                    name.symbol,
+                    params
+                        .iter()
+                        .map(|p| p.symbol)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             }
         }
     }
