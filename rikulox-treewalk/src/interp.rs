@@ -4,10 +4,13 @@ use rikulox_ast::{
     expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
     stmt::{Stmt, StmtKind},
 };
-use rikulox_runtime::error::{RuntimeError, RuntimeErrorKind};
 
 use crate::{
-    call::Function, env::Environment, native::CLOCK_FN, obj::Object,
+    call::Function,
+    env::Environment,
+    error::{RuntimeError, RuntimeErrorKind},
+    native::CLOCK_FN,
+    obj::Object,
     value::Value,
 };
 
@@ -99,6 +102,17 @@ impl<'src> TreeWalkInterpreter<'src> {
                 )));
 
                 self.env.borrow_mut().define(declaration.name.symbol, fun);
+            }
+            StmtKind::Return(value) => {
+                let value = value
+                    .clone()
+                    .map(|expr| self.eval(&expr))
+                    .unwrap_or(Ok(Value::Nil))?;
+
+                return Err(RuntimeError {
+                    kind: RuntimeErrorKind::Return(value),
+                    span: stmt.span,
+                });
             }
         };
         Ok(())

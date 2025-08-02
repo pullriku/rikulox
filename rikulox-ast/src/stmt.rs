@@ -30,6 +30,7 @@ pub enum StmtKind<'src> {
         body: Box<Stmt<'src>>,
     },
     Function(FunctionDecl<'src>),
+    Return(Option<Expr<'src>>),
 }
 
 #[derive(Debug, Clone, PartialEq)]

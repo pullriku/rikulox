@@ -203,6 +203,10 @@ where
                 let for_span = self.advance().unwrap().span;
                 self.for_statement(for_span)
             }
+            TokenKind::Keyword(Keyword::Return) => {
+                let return_span = self.advance().unwrap().span;
+                self.return_statement(return_span)
+            }
             TokenKind::LBrace => {
                 let l_brace_span = self.advance().unwrap().span;
                 self.block_statement(l_brace_span)
@@ -396,6 +400,29 @@ where
         let r_brace = self.consume(&TokenKind::RBrace)?;
 
         Ok((stmts, r_brace.span))
+    }
+
+    fn return_statement(
+        &mut self,
+        return_span: Span,
+    ) -> Result<Stmt<'src>, ParseError<'src>> {
+        let value = match self.peek() {
+            Some(Token {
+                kind: TokenKind::Semicolon,
+                ..
+            }) => None,
+            _ => {
+                let expr = self.expression()?;
+                self.consume(&TokenKind::Semicolon)?;
+                Some(expr)
+            }
+        };
+
+        Ok(Stmt {
+            kind: StmtKind::Return(value),
+            span: return_span,
+            id: self.id_gen.next_id(),
+        })
     }
 
     fn expression_statement(&mut self) -> Result<Stmt<'src>, ParseError<'src>> {

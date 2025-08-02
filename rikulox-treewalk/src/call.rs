@@ -1,10 +1,13 @@
 use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 use rikulox_ast::{span::Span, stmt::FunctionDecl};
-use rikulox_runtime::error::{RuntimeError, RuntimeErrorKind};
 
 use crate::{
-    env::Environment, interp::TreeWalkInterpreter, obj::Object, value::Value,
+    env::Environment,
+    error::{RuntimeError, RuntimeErrorKind},
+    interp::TreeWalkInterpreter,
+    obj::Object,
+    value::Value,
 };
 
 pub trait Call<'src> {
@@ -49,10 +52,19 @@ impl<'src> Call<'src> for Function<'src> {
             env.define(param.symbol, arg.clone());
         }
 
-        interp
-            .exec_block(&self.declaration.body, Rc::new(RefCell::new(env)))?;
+        let result = interp
+            .exec_block(&self.declaration.body, Rc::new(RefCell::new(env)));
 
-        Ok(Value::Nil)
+        if let Err(RuntimeError {
+            kind: RuntimeErrorKind::Return(value),
+            span: _,
+        }) = result
+        {
+            Ok(value)
+        } else {
+            result?;
+            Ok(Value::Nil)
+        }
     }
 }
 

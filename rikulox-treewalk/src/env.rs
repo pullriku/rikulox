@@ -1,8 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use rikulox_runtime::error::RuntimeErrorKind;
-
-use crate::value::Value;
+use crate::{error::RuntimeErrorKind, value::Value};
 
 #[derive(Debug, Clone)]
 pub struct Environment<'src> {

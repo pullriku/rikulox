@@ -1,6 +1,7 @@
-use rikulox_runtime::error::RuntimeError;
-
-use crate::{call::NativeFunction, interp::TreeWalkInterpreter, value::Value};
+use crate::{
+    call::NativeFunction, error::RuntimeError, interp::TreeWalkInterpreter,
+    value::Value,
+};
 
 pub const CLOCK_FN: NativeFunction = NativeFunction {
     arity: 0,
