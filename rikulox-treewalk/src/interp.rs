@@ -259,7 +259,7 @@ impl<'src> TreeWalkInterpreter<'src> {
             }
             ExprKind::Get { object, name } => {
                 let object = self.eval(object.as_ref())?;
-                
+
                 let Value::Object(object) = object else {
                     return Err(RuntimeError {
                         kind: RuntimeErrorKind::TypeError(expr.clone()),
@@ -280,6 +280,32 @@ impl<'src> TreeWalkInterpreter<'src> {
                     ),
                     span: expr.span,
                 })?
+            }
+            ExprKind::Set {
+                object,
+                name,
+                value,
+            } => {
+                let value = self.eval(value.as_ref())?;
+
+                let Value::Object(object) = self.eval(object.as_ref())? else {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::TypeError(expr.clone()),
+                        span: expr.span,
+                    });
+                };
+
+                let Object::Instance(instance) = &mut *object.borrow_mut()
+                else {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::TypeError(expr.clone()),
+                        span: expr.span,
+                    });
+                };
+
+                instance.set(name.symbol.to_string(), value.clone());
+
+                value
             }
         };
 

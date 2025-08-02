@@ -42,6 +42,11 @@ pub enum ExprKind<'src> {
         object: Box<Expr<'src>>,
         name: Identifier<'src>,
     },
+    Set {
+        object: Box<Expr<'src>>,
+        name: Identifier<'src>,
+        value: Box<Expr<'src>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

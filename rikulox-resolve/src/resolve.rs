@@ -120,12 +120,8 @@ impl<'src> Resolver<'src> {
                 self.expression(left)?;
                 self.expression(right)?;
             }
-            ExprKind::Unary { op: _, right } => {
-                self.expression(right)?
-            }
-            ExprKind::Grouping(expr) => {
-                self.expression(expr)?
-            }
+            ExprKind::Unary { op: _, right } => self.expression(right)?,
+            ExprKind::Grouping(expr) => self.expression(expr)?,
             ExprKind::Literal(_) => (),
             ExprKind::Variable(identifier) => {
                 if !self.scopes.is_empty()
@@ -166,6 +162,14 @@ impl<'src> Resolver<'src> {
             }
             ExprKind::Get { object, name: _ } => {
                 self.expression(object)?;
+            }
+            ExprKind::Set {
+                object,
+                name: _,
+                value,
+            } => {
+                self.expression(object)?;
+                self.expression(value)?;
             }
         }
 

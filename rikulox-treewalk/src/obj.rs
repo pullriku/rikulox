@@ -1,6 +1,9 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{call::{Call, Class, Function, NativeFunction}, value::Value};
+use crate::{
+    call::{Call, Class, Function, NativeFunction},
+    value::Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Object<'src> {
@@ -45,6 +48,10 @@ pub struct Instance<'src> {
 impl<'src> Instance<'src> {
     pub fn get(&self, name: &str) -> Option<Value<'src>> {
         self.fields.get(name).cloned()
+    }
+
+    pub fn set(&mut self, name: String, value: Value<'src>) {
+        self.fields.insert(name, value);
     }
 }
 

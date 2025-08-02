@@ -37,7 +37,7 @@ impl<'src> Call<'src> for Class {
         _call_span: Span,
     ) -> Result<Value<'src>, RuntimeError<'src>> {
         assert!(args.is_empty());
-        
+
         Ok(Value::Object(Rc::new(RefCell::new(Object::Instance(
             Instance {
                 class: self.clone(),

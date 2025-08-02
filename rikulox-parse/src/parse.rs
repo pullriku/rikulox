@@ -515,6 +515,16 @@ where
                     span: expr.span.with_end_from(token_eq.span),
                     id: self.id_gen.next_id(),
                 })
+            } else if let ExprKind::Get { object, name } = expr.kind {
+                Ok(Expr {
+                    kind: ExprKind::Set {
+                        object,
+                        name,
+                        value: Box::new(value),
+                    },
+                    span: expr.span.with_end_from(token_eq.span),
+                    id: self.id_gen.next_id(),
+                })
             } else {
                 Err(ParseError {
                     kind: ParseErrorKind::UnexpectedToken {
