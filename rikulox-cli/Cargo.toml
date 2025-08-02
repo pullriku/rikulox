@@ -19,3 +19,4 @@ rikulox-parse = { version = "0.1.0", path = "../rikulox-parse" }
 rikulox-lex = { version = "0.1.0", path = "../rikulox-lex" }
 rikulox-treewalk = { version = "0.1.0", path = "../rikulox-treewalk" }
 rikulox-runtime = { version = "0.1.0", path = "../rikulox-runtime" }
+rikulox-resolve = { version = "0.1.0", path = "../rikulox-resolve" }

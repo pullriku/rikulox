@@ -1,8 +1,7 @@
-use std::{cell::RefCell, mem, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use rikulox_ast::{
-    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
-    stmt::{Stmt, StmtKind},
+    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp}, id::NodeId, span::Span, stmt::{Stmt, StmtKind}
 };
 
 use crate::{
@@ -15,7 +14,9 @@ use crate::{
 };
 
 pub struct TreeWalkInterpreter<'src> {
+    pub(crate) globals: Rc<RefCell<Environment<'src>>>,
     env: Rc<RefCell<Environment<'src>>>,
+    locals: HashMap<NodeId, usize>,
 }
 
 impl<'src> TreeWalkInterpreter<'src> {
@@ -30,22 +31,29 @@ impl<'src> TreeWalkInterpreter<'src> {
         );
 
         Self {
+            globals: Rc::clone(&env),
             env,
+            locals: HashMap::new(),
         }
     }
 
     pub fn from_env(env: Rc<RefCell<Environment<'src>>>) -> Self {
         Self {
+            globals: Rc::clone(&env),
             env,
+            locals: HashMap::new(),
         }
     }
 
     pub fn interpret(
         &mut self,
-        ast: Vec<Stmt<'src>>,
+        ast: &[Stmt<'src>],
+        locals: HashMap<NodeId, usize>,
     ) -> Result<(), RuntimeError<'src>> {
+        self.locals.extend(locals);
+
         for stmt in ast {
-            self.exec(&stmt)?
+            self.exec(stmt)?
         }
         Ok(())
     }
@@ -168,21 +176,31 @@ impl<'src> TreeWalkInterpreter<'src> {
                 Literal::Bool(bool) => Value::Bool(*bool),
             },
             ExprKind::Variable(identifier) => {
-                let name = identifier.symbol;
-                self.env.borrow().get(name).map_err(|kind| RuntimeError {
-                    kind,
-                    span: expr.span,
-                })?
+                self.lookup_variable(identifier.symbol, expr.id, expr.span)?
             }
             ExprKind::Assign { name, value } => {
                 let value = self.eval(value.as_ref())?;
                 let name = name.symbol;
-                self.env.borrow_mut().assign(name, value.clone()).map_err(
+
+                let distance = self.locals.get(&expr.id);
+
+                if let Some(distance) = distance {
+                    self.env.borrow_mut().assign_at(name, value.clone(), *distance).map_err(
                     |kind| RuntimeError {
                         kind,
                         span: expr.span,
                     },
-                )?;
+                    )?;
+                } else {
+                    self.globals
+                        .borrow_mut()
+                        .assign(name, value.clone())
+                        .map_err(|kind| RuntimeError {
+                            kind,
+                            span: expr.span,
+                        })?;
+                }
+
                 value
             }
             ExprKind::Logical { left, op, right } => {
@@ -312,6 +330,24 @@ impl<'src> TreeWalkInterpreter<'src> {
             kind: RuntimeErrorKind::TypeError(expr.clone()),
             span: expr.span,
         })
+    }
+
+    fn lookup_variable(&self, name: &'src str, id: NodeId,span: Span) -> Result<Value<'src>, RuntimeError<'src>> {
+        let distance  = self.locals.get(&id);
+        match distance {
+            Some(distance) => {
+                self.env.borrow().get_at( name, *distance).ok_or(RuntimeError {
+                    kind: RuntimeErrorKind::UndefinedVariable(name.to_string()),
+                    span
+                })
+            }
+            None => {
+                self.globals.borrow().get(name).map_err(|kind| RuntimeError {
+                    kind: kind.clone(),
+                    span,
+                })
+            }
+        }
     }
 }
 

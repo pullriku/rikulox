@@ -410,7 +410,10 @@ where
             Some(Token {
                 kind: TokenKind::Semicolon,
                 ..
-            }) => None,
+            }) => {
+                self.advance().unwrap();
+                None
+            }
             _ => {
                 let expr = self.expression()?;
                 self.consume(&TokenKind::Semicolon)?;

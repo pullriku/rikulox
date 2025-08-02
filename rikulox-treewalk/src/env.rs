@@ -48,7 +48,7 @@ impl<'src> Environment<'src> {
 
     pub fn get(
         &self,
-        name: &str,
+        name: &'src str,
     ) -> Result<Value<'src>, RuntimeErrorKind<'src>> {
         match (self.values.get(name), &self.enclosing) {
             (Some(var), _) => Ok(var.clone()),
@@ -57,6 +57,33 @@ impl<'src> Environment<'src> {
                 Err(RuntimeErrorKind::UndefinedVariable(name.to_string()))
             }
         }
+    }
+
+    pub fn get_at(&self, name: &'src str, distance: usize) -> Option<Value<'src>> {
+        self.ancestor(distance)?.borrow().values.get(name).cloned()
+    }
+
+    pub fn assign_at(&mut self, name: &'src str, value: Value<'src>, distance: usize) -> Result<(), RuntimeErrorKind<'src>> {
+        self.ancestor(distance).ok_or(RuntimeErrorKind::UndefinedVariable(name.to_string()))?.borrow_mut().values.insert(name, value);
+
+        Ok(())
+    }
+
+    fn ancestor(&self, distance: usize) -> Option<Rc<RefCell<Environment<'src>>>> {
+        if distance == 0 {
+            return Some(Rc::new(RefCell::new(self.clone())));
+        }
+
+        let mut environment: Rc<RefCell<Environment>> = Rc::clone(self.enclosing.as_ref().unwrap());
+        for _ in 1..distance {
+            if let Some(enclosing) = environment.clone().borrow().enclosing.as_ref() {
+                environment = Rc::clone(enclosing);
+            } else {
+                return None;
+            }
+        }
+
+        Some(environment)
     }
 }
 

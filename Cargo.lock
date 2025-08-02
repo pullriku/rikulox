@@ -154,6 +154,7 @@ dependencies = [
  "clap",
  "rikulox-lex",
  "rikulox-parse",
+ "rikulox-resolve",
  "rikulox-runtime",
  "rikulox-treewalk",
 ]
@@ -176,6 +177,13 @@ version = "0.1.0"
 dependencies = [
  "rikulox-ast",
  "rikulox-lex",
+]
+
+[[package]]
+name = "rikulox-resolve"
+version = "0.1.0"
+dependencies = [
+ "rikulox-ast",
 ]
 
 [[package]]

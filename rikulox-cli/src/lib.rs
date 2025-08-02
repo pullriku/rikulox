@@ -5,6 +5,7 @@ use std::{
 
 use rikulox_lex::scan::{ScanTokens, Scanner};
 use rikulox_parse::parse::Parser;
+use rikulox_resolve::resolve::Resolver;
 use rikulox_treewalk::interp::TreeWalkInterpreter;
 
 pub fn run_file(path: &Path) -> io::Result<()> {
@@ -55,14 +56,14 @@ fn run<'src>(
         lexer.scan_tokens()
     };
 
-    for error in &lex_errors {
-        println!("{error:?}");
+    if !lex_errors.is_empty() {
+        println!("{lex_errors:#?}");
     }
 
     let mut parser = Parser::new(tokens.into_iter().peekable(), eof_span);
     let parse_result = parser.parse();
 
-    let ast = match parse_result {
+    let ast = match &parse_result {
         Ok(ast) => ast,
         Err(error) => {
             println!("{error:?}");
@@ -74,7 +75,18 @@ fn run<'src>(
         return Ok(());
     }
 
-    if let Err(error) = interp.interpret(ast) {
+    let mut resolver =  Resolver::new();
+    let resolve_result = resolver.resolve(ast);
+
+    if let Err(error) = &resolve_result {
+        println!("{error:?}");
+    }
+
+    if !lex_errors.is_empty() || parse_result.is_err() || resolve_result.is_err() {
+        return Ok(());
+    }
+
+    if let Err(error) = interp.interpret(ast, resolver.into_locals()) {
         println!("{error:?}");
     };
 

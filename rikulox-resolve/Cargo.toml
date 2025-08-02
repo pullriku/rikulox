@@ -1,0 +1,12 @@
+[package]
+name = "rikulox-resolve"
+authors.workspace = true
+edition.workspace = true
+version.workspace = true
+readme.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+rikulox-ast = { version = "0.1.0", path = "../rikulox-ast" }
