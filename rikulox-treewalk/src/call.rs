@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fmt::Display, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use rikulox_ast::{span::Span, stmt::FunctionDecl};
 
@@ -31,15 +31,19 @@ impl<'src> Call<'src> for Class {
     }
 
     fn call(
-            &self,
-            interp: &mut TreeWalkInterpreter<'src>,
-            args: &[Value<'src>],
-            call_span: Span,
-        ) -> Result<Value<'src>, RuntimeError<'src>> {
+        &self,
+        _interp: &mut TreeWalkInterpreter<'src>,
+        args: &[Value<'src>],
+        _call_span: Span,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        assert!(args.is_empty());
         
-        Ok(Value::Object(Rc::new(RefCell::new(Object::Instance(Instance {
-            class: self.clone(),
-        })))))
+        Ok(Value::Object(Rc::new(RefCell::new(Object::Instance(
+            Instance {
+                class: self.clone(),
+                fields: HashMap::new(),
+            },
+        )))))
     }
 }
 

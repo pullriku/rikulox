@@ -1,7 +1,7 @@
 use std::{collections::HashMap, mem};
 
 use rikulox_ast::{
-    expr::Expr,
+    expr::{Expr, ExprKind},
     id::NodeId,
     span::Span,
     stmt::{FunctionDecl, Stmt, StmtKind},
@@ -116,18 +116,18 @@ impl<'src> Resolver<'src> {
         let Expr { kind, span, id } = expr;
 
         match kind {
-            rikulox_ast::expr::ExprKind::Binary { left, op: _, right } => {
+            ExprKind::Binary { left, op: _, right } => {
                 self.expression(left)?;
                 self.expression(right)?;
             }
-            rikulox_ast::expr::ExprKind::Unary { op: _, right } => {
+            ExprKind::Unary { op: _, right } => {
                 self.expression(right)?
             }
-            rikulox_ast::expr::ExprKind::Grouping(expr) => {
+            ExprKind::Grouping(expr) => {
                 self.expression(expr)?
             }
-            rikulox_ast::expr::ExprKind::Literal(_) => (),
-            rikulox_ast::expr::ExprKind::Variable(identifier) => {
+            ExprKind::Literal(_) => (),
+            ExprKind::Variable(identifier) => {
                 if !self.scopes.is_empty()
                     && self
                         .scopes
@@ -150,19 +150,22 @@ impl<'src> Resolver<'src> {
                 }
                 self.resolve_local(*id, identifier.symbol);
             }
-            rikulox_ast::expr::ExprKind::Assign { name, value } => {
+            ExprKind::Assign { name, value } => {
                 self.expression(value)?;
                 self.resolve_local(*id, name.symbol);
             }
-            rikulox_ast::expr::ExprKind::Logical { left, op: _, right } => {
+            ExprKind::Logical { left, op: _, right } => {
                 self.expression(left)?;
                 self.expression(right)?;
             }
-            rikulox_ast::expr::ExprKind::Call { callee, args } => {
+            ExprKind::Call { callee, args } => {
                 self.expression(callee)?;
                 for arg in args {
                     self.expression(arg)?;
                 }
+            }
+            ExprKind::Get { object, name: _ } => {
+                self.expression(object)?;
             }
         }
 

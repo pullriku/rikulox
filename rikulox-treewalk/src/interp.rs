@@ -124,9 +124,14 @@ impl<'src> TreeWalkInterpreter<'src> {
                 });
             }
             StmtKind::Class(decl) => {
-                self.env.borrow_mut().define(decl.name.symbol, Value::Object(Rc::new(RefCell::new(Object::Class(Class{
-                    name: decl.name.symbol.to_string(),
-                })))));
+                self.env.borrow_mut().define(
+                    decl.name.symbol,
+                    Value::Object(Rc::new(RefCell::new(Object::Class(
+                        Class {
+                            name: decl.name.symbol.to_string(),
+                        },
+                    )))),
+                );
             }
         };
         Ok(())
@@ -251,6 +256,30 @@ impl<'src> TreeWalkInterpreter<'src> {
                 });
 
                 callee?.call(self, &args, expr.span)?
+            }
+            ExprKind::Get { object, name } => {
+                let object = self.eval(object.as_ref())?;
+                
+                let Value::Object(object) = object else {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::TypeError(expr.clone()),
+                        span: expr.span,
+                    });
+                };
+
+                let Object::Instance(instance) = &*object.borrow() else {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::TypeError(expr.clone()),
+                        span: expr.span,
+                    });
+                };
+
+                instance.get(name.symbol).ok_or(RuntimeError {
+                    kind: RuntimeErrorKind::UndefinedProperty(
+                        name.symbol.to_string(),
+                    ),
+                    span: expr.span,
+                })?
             }
         };
 

@@ -1,6 +1,6 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
-use crate::call::{Call, Class, Function, NativeFunction};
+use crate::{call::{Call, Class, Function, NativeFunction}, value::Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Object<'src> {
@@ -8,7 +8,7 @@ pub enum Object<'src> {
     Function(Function<'src>),
     NativeFunction(NativeFunction),
     Class(Class),
-    Instance(Instance),
+    Instance(Instance<'src>),
 }
 
 impl<'src> Object<'src> {
@@ -37,11 +37,18 @@ impl<'src> Display for Object<'src> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Instance {
+pub struct Instance<'src> {
     pub class: Class,
+    pub fields: HashMap<String, Value<'src>>,
 }
 
-impl Display for Instance {
+impl<'src> Instance<'src> {
+    pub fn get(&self, name: &str) -> Option<Value<'src>> {
+        self.fields.get(name).cloned()
+    }
+}
+
+impl<'src> Display for Instance<'src> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} instance", self.class)
     }

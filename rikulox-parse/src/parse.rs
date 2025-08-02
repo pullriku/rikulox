@@ -180,14 +180,20 @@ where
         self.consume(&TokenKind::LBrace)?;
         let (body, end_span) = self.block()?;
 
-        Ok((FunctionDecl {
+        Ok((
+            FunctionDecl {
                 name: Identifier { symbol: ident },
                 params,
                 body,
-            }, end_span))
+            },
+            end_span,
+        ))
     }
 
-    fn class_decl(&mut self, class_span: Span) -> Result<Stmt<'src>, ParseError<'src>> {
+    fn class_decl(
+        &mut self,
+        class_span: Span,
+    ) -> Result<Stmt<'src>, ParseError<'src>> {
         let name = match self.peek_or_err(ExpectedItem::Ident)? {
             &Token {
                 kind: TokenKind::Identifier(name),
@@ -208,10 +214,12 @@ where
         };
 
         self.consume(&TokenKind::LBrace)?;
-        
+
         let mut methods = Vec::new();
 
-        while let Some(token) = self.peek() && !matches!(token.kind, TokenKind::RBrace) {
+        while let Some(token) = self.peek()
+            && !matches!(token.kind, TokenKind::RBrace)
+        {
             let (fun, _end_span) = self.function_decl(None)?;
             methods.push(fun);
         }
@@ -714,19 +722,43 @@ where
         let mut expr = self.primary()?;
         let expr_span = expr.span;
 
-        while let Some(token) = self.peek()
-            && matches!(token.kind, TokenKind::LParen)
-        {
-            let l_paren = self.advance().unwrap();
-            let (args, r_paren_span) = self.arguments(l_paren.span)?;
+        loop {
+            match self.peek().map(|token| token.kind) {
+                Some(TokenKind::LParen) => {
+                    let l_paren = self.advance().unwrap();
+                    let (args, r_paren_span) = self.arguments(l_paren.span)?;
 
-            expr = Expr {
-                kind: ExprKind::Call {
-                    callee: Box::new(expr),
-                    args,
-                },
-                span: expr_span.with_end_from(r_paren_span),
-                id: self.id_gen.next_id(),
+                    expr = Expr {
+                        kind: ExprKind::Call {
+                            callee: Box::new(expr),
+                            args,
+                        },
+                        span: expr_span.with_end_from(r_paren_span),
+                        id: self.id_gen.next_id(),
+                    }
+                }
+
+                Some(TokenKind::Dot) => {
+                    let _dot = self.advance().unwrap();
+                    let Token {
+                        kind: TokenKind::Identifier(ident),
+                        span: ident_span,
+                    } = self.consume(&TokenKind::Identifier(""))?
+                    else {
+                        unreachable!();
+                    };
+
+                    expr = Expr {
+                        kind: ExprKind::Get {
+                            object: Box::new(expr),
+                            name: Identifier { symbol: ident },
+                        },
+                        span: expr_span.with_end_from(ident_span),
+                        id: self.id_gen.next_id(),
+                    }
+                }
+
+                _ => break,
             }
         }
 
