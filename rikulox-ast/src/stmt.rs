@@ -31,6 +31,7 @@ pub enum StmtKind<'src> {
     },
     Function(FunctionDecl<'src>),
     Return(Option<Expr<'src>>),
+    Class(ClassDecl<'src>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,4 +39,10 @@ pub struct FunctionDecl<'src> {
     pub name: Identifier<'src>,
     pub params: Vec<Identifier<'src>>,
     pub body: Vec<Stmt<'src>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassDecl<'src> {
+    pub name: Identifier<'src>,
+    pub methods: Vec<FunctionDecl<'src>>,
 }

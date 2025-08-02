@@ -6,7 +6,7 @@ use crate::{
     env::Environment,
     error::{RuntimeError, RuntimeErrorKind},
     interp::TreeWalkInterpreter,
-    obj::Object,
+    obj::{Instance, Object},
     value::Value,
 };
 
@@ -18,6 +18,35 @@ pub trait Call<'src> {
         args: &[Value<'src>],
         call_span: Span,
     ) -> Result<Value<'src>, RuntimeError<'src>>;
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Class {
+    pub name: String,
+}
+
+impl<'src> Call<'src> for Class {
+    fn arity(&self) -> usize {
+        0
+    }
+
+    fn call(
+            &self,
+            interp: &mut TreeWalkInterpreter<'src>,
+            args: &[Value<'src>],
+            call_span: Span,
+        ) -> Result<Value<'src>, RuntimeError<'src>> {
+        
+        Ok(Value::Object(Rc::new(RefCell::new(Object::Instance(Instance {
+            class: self.clone(),
+        })))))
+    }
+}
+
+impl Display for Class {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

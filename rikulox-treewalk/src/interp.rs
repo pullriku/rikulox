@@ -8,7 +8,7 @@ use rikulox_ast::{
 };
 
 use crate::{
-    call::Function,
+    call::{Class, Function},
     env::Environment,
     error::{RuntimeError, RuntimeErrorKind},
     native::CLOCK_FN,
@@ -122,6 +122,11 @@ impl<'src> TreeWalkInterpreter<'src> {
                     kind: RuntimeErrorKind::Return(value),
                     span: stmt.span,
                 });
+            }
+            StmtKind::Class(decl) => {
+                self.env.borrow_mut().define(decl.name.symbol, Value::Object(Rc::new(RefCell::new(Object::Class(Class{
+                    name: decl.name.symbol.to_string(),
+                })))));
             }
         };
         Ok(())

@@ -102,6 +102,11 @@ impl<'src> Resolver<'src> {
                     self.expression(expr)?;
                 }
             }
+
+            StmtKind::Class(class_decl) => {
+                self.declare(class_decl.name.symbol, *span)?;
+                self.define(class_decl.name.symbol);
+            }
         }
 
         Ok(())

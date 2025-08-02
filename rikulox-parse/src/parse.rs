@@ -4,7 +4,7 @@ use rikulox_ast::{
     expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
     id::IdGen,
     span::Span,
-    stmt::{FunctionDecl, Stmt, StmtKind},
+    stmt::{ClassDecl, FunctionDecl, Stmt, StmtKind},
     token::{Keyword, Token, TokenKind},
 };
 
@@ -50,7 +50,16 @@ where
             }
             TokenKind::Keyword(Keyword::Fun) => {
                 let fun_span = self.advance().unwrap().span;
-                self.function_decl(Some(fun_span))
+                let (fun, end_span) = self.function_decl(Some(fun_span))?;
+                Ok(Stmt {
+                    kind: StmtKind::Function(fun),
+                    span: fun_span.with_end_from(end_span),
+                    id: self.id_gen.next_id(),
+                })
+            }
+            TokenKind::Keyword(Keyword::Class) => {
+                let class_span = self.advance().unwrap().span;
+                self.class_decl(class_span)
             }
             _ => self.statement(),
         }
@@ -132,7 +141,7 @@ where
     fn function_decl(
         &mut self,
         fun_span: Option<Span>,
-    ) -> Result<Stmt<'src>, ParseError<'src>> {
+    ) -> Result<(FunctionDecl<'src>, Span), ParseError<'src>> {
         let Token {
             kind: TokenKind::Identifier(ident),
             span: ident_span,
@@ -171,13 +180,50 @@ where
         self.consume(&TokenKind::LBrace)?;
         let (body, end_span) = self.block()?;
 
-        Ok(Stmt {
-            kind: StmtKind::Function(FunctionDecl {
+        Ok((FunctionDecl {
                 name: Identifier { symbol: ident },
                 params,
                 body,
+            }, end_span))
+    }
+
+    fn class_decl(&mut self, class_span: Span) -> Result<Stmt<'src>, ParseError<'src>> {
+        let name = match self.peek_or_err(ExpectedItem::Ident)? {
+            &Token {
+                kind: TokenKind::Identifier(name),
+                ..
+            } => {
+                self.advance().unwrap();
+                name
+            }
+            unexpected => {
+                return Err(ParseError {
+                    kind: ParseErrorKind::UnexpectedToken {
+                        expected: ExpectedItem::Ident,
+                        found: unexpected.kind,
+                    },
+                    span: unexpected.span,
+                });
+            }
+        };
+
+        self.consume(&TokenKind::LBrace)?;
+        
+        let mut methods = Vec::new();
+
+        while let Some(token) = self.peek() && !matches!(token.kind, TokenKind::RBrace) {
+            let (fun, _end_span) = self.function_decl(None)?;
+            methods.push(fun);
+        }
+
+        let r_brace = self.consume(&TokenKind::RBrace)?;
+
+        Ok(Stmt {
+            kind: StmtKind::Class(ClassDecl {
+                name: Identifier { symbol: name },
+                methods,
             }),
-            span: fun_span.unwrap_or(ident_span).with_end_from(end_span),
+            span: class_span.with_end_from(r_brace.span),
             id: self.id_gen.next_id(),
         })
     }
