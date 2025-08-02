@@ -1,7 +1,10 @@
 use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use rikulox_ast::{
-    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp}, id::NodeId, span::Span, stmt::{Stmt, StmtKind}
+    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
+    id::NodeId,
+    span::Span,
+    stmt::{Stmt, StmtKind},
 };
 
 use crate::{
@@ -185,12 +188,13 @@ impl<'src> TreeWalkInterpreter<'src> {
                 let distance = self.locals.get(&expr.id);
 
                 if let Some(distance) = distance {
-                    self.env.borrow_mut().assign_at(name, value.clone(), *distance).map_err(
-                    |kind| RuntimeError {
-                        kind,
-                        span: expr.span,
-                    },
-                    )?;
+                    self.env
+                        .borrow_mut()
+                        .assign_at(name, value.clone(), *distance)
+                        .map_err(|kind| RuntimeError {
+                            kind,
+                            span: expr.span,
+                        })?;
                 } else {
                     self.globals
                         .borrow_mut()
@@ -332,20 +336,33 @@ impl<'src> TreeWalkInterpreter<'src> {
         })
     }
 
-    fn lookup_variable(&self, name: &'src str, id: NodeId,span: Span) -> Result<Value<'src>, RuntimeError<'src>> {
-        let distance  = self.locals.get(&id);
+    fn lookup_variable(
+        &self,
+        name: &'src str,
+        id: NodeId,
+        span: Span,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        let distance = self.locals.get(&id);
         match distance {
             Some(distance) => {
-                self.env.borrow().get_at( name, *distance).ok_or(RuntimeError {
-                    kind: RuntimeErrorKind::UndefinedVariable(name.to_string()),
-                    span
-                })
+                self.env
+                    .borrow()
+                    .get_at(name, *distance)
+                    .ok_or(RuntimeError {
+                        kind: RuntimeErrorKind::UndefinedVariable(
+                            name.to_string(),
+                        ),
+                        span,
+                    })
             }
             None => {
-                self.globals.borrow().get(name).map_err(|kind| RuntimeError {
-                    kind: kind.clone(),
-                    span,
-                })
+                self.globals
+                    .borrow()
+                    .get(name)
+                    .map_err(|kind| RuntimeError {
+                        kind: kind.clone(),
+                        span,
+                    })
             }
         }
     }

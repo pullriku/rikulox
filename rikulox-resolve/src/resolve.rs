@@ -1,6 +1,11 @@
 use std::{collections::HashMap, mem};
 
-use rikulox_ast::{expr::Expr, id::NodeId, span::Span, stmt::{FunctionDecl, Stmt, StmtKind}};
+use rikulox_ast::{
+    expr::Expr,
+    id::NodeId,
+    span::Span,
+    stmt::{FunctionDecl, Stmt, StmtKind},
+};
 
 use crate::error::{ResolveError, ResolveErrorKind};
 
@@ -12,15 +17,22 @@ pub struct Resolver<'src> {
 
 impl<'src> Resolver<'src> {
     pub fn new() -> Self {
-        Self { scopes: vec![], locals: HashMap::new(), current_function: FunctionKind::None }
+        Self {
+            scopes: vec![],
+            locals: HashMap::new(),
+            current_function: FunctionKind::None,
+        }
     }
 
     pub fn into_locals(self) -> HashMap<NodeId, usize> {
         self.locals
     }
 
-    pub fn resolve(&mut self, stmts: &[Stmt<'src>]) -> Result<(), ResolveError> {
-        let mut errors =  Vec::new();
+    pub fn resolve(
+        &mut self,
+        stmts: &[Stmt<'src>],
+    ) -> Result<(), ResolveError> {
+        let mut errors = Vec::new();
         for stmt in stmts {
             match self.statement(stmt) {
                 Ok(()) => (),
@@ -36,7 +48,7 @@ impl<'src> Resolver<'src> {
     }
 
     fn statement(&mut self, stmt: &Stmt<'src>) -> Result<(), ResolveError> {
-        let Stmt { kind, span, id: _ }  = stmt;
+        let Stmt { kind, span, id: _ } = stmt;
         match kind {
             StmtKind::Expression(expr) => self.expression(expr)?,
             StmtKind::Print(expr) => self.expression(expr)?,
@@ -53,14 +65,17 @@ impl<'src> Resolver<'src> {
                     self.statement(stmt)?;
                 }
                 self.end_scope();
-            },
-            StmtKind::If { condition, then_branch, else_branch } => {
+            }
+            StmtKind::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
                 self.expression(condition)?;
                 self.statement(then_branch)?;
                 if let Some(else_branch) = else_branch {
                     self.statement(else_branch)?;
                 }
-
             }
             StmtKind::While { condition, body } => {
                 self.expression(condition)?;
@@ -69,7 +84,11 @@ impl<'src> Resolver<'src> {
             StmtKind::Function(function_decl) => {
                 self.declare(function_decl.name.symbol, *span)?;
                 self.define(function_decl.name.symbol);
-                self.resolve_function(function_decl, FunctionKind::Function, *span)?;
+                self.resolve_function(
+                    function_decl,
+                    FunctionKind::Function,
+                    *span,
+                )?;
             }
             StmtKind::Return(expr) => {
                 if self.current_function == FunctionKind::None {
@@ -88,7 +107,7 @@ impl<'src> Resolver<'src> {
         Ok(())
     }
 
-    fn expression(&mut self, expr: &Expr<'src>) ->  Result<(), ResolveError> {
+    fn expression(&mut self, expr: &Expr<'src>) -> Result<(), ResolveError> {
         let Expr { kind, span, id } = expr;
 
         match kind {
@@ -96,18 +115,35 @@ impl<'src> Resolver<'src> {
                 self.expression(left)?;
                 self.expression(right)?;
             }
-            rikulox_ast::expr::ExprKind::Unary { op: _, right } => self.expression(right)?,
-            rikulox_ast::expr::ExprKind::Grouping(expr) => self.expression(expr)?,
+            rikulox_ast::expr::ExprKind::Unary { op: _, right } => {
+                self.expression(right)?
+            }
+            rikulox_ast::expr::ExprKind::Grouping(expr) => {
+                self.expression(expr)?
+            }
             rikulox_ast::expr::ExprKind::Literal(_) => (),
             rikulox_ast::expr::ExprKind::Variable(identifier) => {
-                if !self.scopes.is_empty() && self.scopes.last().unwrap().contains_key(&identifier.symbol) && !self.scopes.last().unwrap().get(&identifier.symbol).unwrap() {
+                if !self.scopes.is_empty()
+                    && self
+                        .scopes
+                        .last()
+                        .unwrap()
+                        .contains_key(&identifier.symbol)
+                    && !self
+                        .scopes
+                        .last()
+                        .unwrap()
+                        .get(&identifier.symbol)
+                        .unwrap()
+                {
                     return Err(ResolveError {
-                        kind: ResolveErrorKind::UninitializedVariable(identifier.symbol.to_string()),
+                        kind: ResolveErrorKind::UninitializedVariable(
+                            identifier.symbol.to_string(),
+                        ),
                         span: *span,
                     });
                 }
                 self.resolve_local(*id, identifier.symbol);
-
             }
             rikulox_ast::expr::ExprKind::Assign { name, value } => {
                 self.expression(value)?;
@@ -136,14 +172,20 @@ impl<'src> Resolver<'src> {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: &'src str, span: Span) ->  Result<(), ResolveError> {
+    fn declare(
+        &mut self,
+        name: &'src str,
+        span: Span,
+    ) -> Result<(), ResolveError> {
         let Some(scope) = self.scopes.last_mut() else {
             return Ok(());
         };
 
         if scope.contains_key(name) {
             return Err(ResolveError {
-                kind: ResolveErrorKind::VariableAlreadyDeclared(name.to_string()),
+                kind: ResolveErrorKind::VariableAlreadyDeclared(
+                    name.to_string(),
+                ),
                 span,
             });
         }
@@ -169,11 +211,20 @@ impl<'src> Resolver<'src> {
         }
     }
 
-    fn resolve_function(&mut self, function_decl: &FunctionDecl<'src>, mut function_kind: FunctionKind, span: Span) -> Result<(), ResolveError>{
+    fn resolve_function(
+        &mut self,
+        function_decl: &FunctionDecl<'src>,
+        mut function_kind: FunctionKind,
+        span: Span,
+    ) -> Result<(), ResolveError> {
         mem::swap(&mut self.current_function, &mut function_kind);
-        let enclosing_function =  function_kind;
+        let enclosing_function = function_kind;
 
-        let FunctionDecl { name: _, params, body } =  function_decl;
+        let FunctionDecl {
+            name: _,
+            params,
+            body,
+        } = function_decl;
         self.begin_scope();
         for param in params {
             self.declare(param.symbol, span)?;

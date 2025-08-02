@@ -1,2 +1,2 @@
-pub mod resolve;
 pub mod error;
+pub mod resolve;

@@ -75,14 +75,17 @@ fn run<'src>(
         return Ok(());
     }
 
-    let mut resolver =  Resolver::new();
+    let mut resolver = Resolver::new();
     let resolve_result = resolver.resolve(ast);
 
     if let Err(error) = &resolve_result {
         println!("{error:?}");
     }
 
-    if !lex_errors.is_empty() || parse_result.is_err() || resolve_result.is_err() {
+    if !lex_errors.is_empty()
+        || parse_result.is_err()
+        || resolve_result.is_err()
+    {
         return Ok(());
     }
 
