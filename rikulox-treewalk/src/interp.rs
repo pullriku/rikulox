@@ -6,15 +6,38 @@ use rikulox_ast::{
 };
 use rikulox_runtime::error::{RuntimeError, RuntimeErrorKind};
 
-use crate::{env::Environment, value::Value};
+use crate::{
+    call::Function, env::Environment, native::CLOCK_FN, obj::Object,
+    value::Value,
+};
 
 pub struct TreeWalkInterpreter<'src> {
+    pub(crate) globals: Rc<RefCell<Environment<'src>>>,
     env: Rc<RefCell<Environment<'src>>>,
 }
 
 impl<'src> TreeWalkInterpreter<'src> {
-    pub fn new(env: Rc<RefCell<Environment<'src>>>) -> Self {
-        Self { env }
+    pub fn new() -> Self {
+        let env = Rc::new(RefCell::new(Environment::new()));
+
+        env.borrow_mut().define(
+            "clock",
+            Value::Object(Rc::new(RefCell::new(
+                Object::NativeFunction::<'src>(CLOCK_FN),
+            ))),
+        );
+
+        Self {
+            globals: Rc::clone(&env),
+            env,
+        }
+    }
+
+    pub fn from_env(env: Rc<RefCell<Environment<'src>>>) -> Self {
+        Self {
+            globals: Rc::clone(&env),
+            env,
+        }
     }
 
     pub fn interpret(
@@ -32,7 +55,9 @@ impl<'src> TreeWalkInterpreter<'src> {
             StmtKind::Expression(expr) => {
                 self.eval(expr)?;
             }
-            StmtKind::Print(_expr) => todo!(),
+            StmtKind::Print(expr) => {
+                println!("{}", self.eval(expr)?);
+            }
             StmtKind::Var {
                 name: Identifier { symbol },
                 init,
@@ -66,12 +91,20 @@ impl<'src> TreeWalkInterpreter<'src> {
                 }
             }
 
-            StmtKind::Function(_decl) => todo!(),
+            StmtKind::Function(declaration) => {
+                let fun = Value::Object(Rc::new(RefCell::new(
+                    Object::Function(Function {
+                        declaration: declaration.clone(),
+                    }),
+                )));
+
+                self.env.borrow_mut().define(declaration.name.symbol, fun);
+            }
         };
         Ok(())
     }
 
-    fn exec_block(
+    pub(crate) fn exec_block(
         &mut self,
         stmts: &[Stmt<'src>],
         mut env: Rc<RefCell<Environment<'src>>>,
@@ -116,7 +149,9 @@ impl<'src> TreeWalkInterpreter<'src> {
             ExprKind::Grouping(expr) => self.eval(expr.as_ref())?,
             ExprKind::Literal(literal) => match literal {
                 Literal::Number(number) => Value::Number(*number),
-                Literal::String(_string) => todo!(),
+                Literal::String(string) => Value::Object(Rc::new(
+                    RefCell::new(Object::String(string.to_string())),
+                )),
                 Literal::Nil => Value::Nil,
                 Literal::Bool(bool) => Value::Bool(*bool),
             },
@@ -156,7 +191,28 @@ impl<'src> TreeWalkInterpreter<'src> {
 
                 self.eval(right.as_ref())?
             }
-            ExprKind::Call { callee: _, args: _ } => todo!(),
+            ExprKind::Call { callee, args } => {
+                let callee = self.eval(callee.as_ref())?;
+                let args = args
+                    .iter()
+                    .map(|arg| self.eval(arg))
+                    .collect::<Result<Vec<Value<'src>>, RuntimeError<'src>>>(
+                    )?;
+                let Value::Object(callee) = callee else {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::TypeError(expr.clone()),
+                        span: expr.span,
+                    });
+                };
+
+                let callee = callee.borrow();
+                let callee = callee.as_call().ok_or(RuntimeError {
+                    kind: RuntimeErrorKind::TypeError(expr.clone()),
+                    span: expr.span,
+                });
+
+                callee?.call(self, &args, expr.span)?
+            }
         };
 
         Ok(object)
@@ -175,7 +231,17 @@ impl<'src> TreeWalkInterpreter<'src> {
                 (Value::Number(l), Value::Number(r)) => {
                     Some(Value::Number(l + r))
                 }
-                // TODO: Add string concatenation
+                (Value::Object(l), Value::Object(r)) => {
+                    let (l, r) = (l.borrow(), r.borrow());
+                    match (&*l, &*r) {
+                        (Object::String(l), Object::String(r)) => {
+                            Some(Value::Object(Rc::new(RefCell::new(
+                                Object::String(l.to_string() + r),
+                            ))))
+                        }
+                        _ => None,
+                    }
+                }
                 _ => None,
             },
             BinOp::Sub => match (left, right) {
@@ -234,5 +300,11 @@ impl<'src> TreeWalkInterpreter<'src> {
             kind: RuntimeErrorKind::TypeError(expr.clone()),
             span: expr.span,
         })
+    }
+}
+
+impl<'src> Default for TreeWalkInterpreter<'src> {
+    fn default() -> Self {
+        Self::new()
     }
 }

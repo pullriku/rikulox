@@ -7,5 +7,4 @@ readme.workspace = true
 
 [dependencies]
 rikulox-ast = { version = "0.1.0", path = "../rikulox-ast" }
-rikulox-gc = { version = "0.1.0", path = "../rikulox-gc" }
 rikulox-runtime = { version = "0.1.0", path = "../rikulox-runtime" }

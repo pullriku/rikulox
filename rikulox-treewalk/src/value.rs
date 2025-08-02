@@ -1,4 +1,4 @@
-use rikulox_gc::{gc::Heap, list::EntryRef};
+use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 use crate::obj::Object;
 
@@ -7,7 +7,7 @@ pub enum Value<'src> {
     Nil,
     Bool(bool),
     Number(f64),
-    Object(EntryRef<Object<'src>>),
+    Object(Rc<RefCell<Object<'src>>>),
 }
 
 impl<'src> Value<'src> {
@@ -18,15 +18,16 @@ impl<'src> Value<'src> {
             _ => true,
         }
     }
+}
 
-    pub fn to_string_with(&self, heap: &Heap<Object<'src>>) -> String {
-        match self {
+impl<'src> Display for Value<'src> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
             Value::Nil => "nil".to_string(),
             Value::Bool(b) => b.to_string(),
             Value::Number(n) => n.to_string(),
-            Value::Object(o) => {
-                heap.get(*o).expect("Object not found").to_string()
-            }
-        }
+            Value::Object(o) => o.borrow().to_string(),
+        };
+        write!(f, "{s}")
     }
 }

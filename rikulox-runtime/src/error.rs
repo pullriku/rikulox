@@ -10,4 +10,5 @@ pub struct RuntimeError<'src> {
 pub enum RuntimeErrorKind<'src> {
     TypeError(Expr<'src>),
     UndefinedVariable(String),
+    Arity { expected: usize, actual: usize },
 }

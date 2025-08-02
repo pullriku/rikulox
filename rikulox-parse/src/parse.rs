@@ -4,7 +4,7 @@ use rikulox_ast::{
     expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
     id::IdGen,
     span::Span,
-    stmt::{Stmt, StmtKind},
+    stmt::{FunctionDecl, Stmt, StmtKind},
     token::{Keyword, Token, TokenKind},
 };
 
@@ -47,6 +47,10 @@ where
             TokenKind::Keyword(Keyword::Var) => {
                 let var_span = self.advance().unwrap().span;
                 self.var_decl(var_span)
+            }
+            TokenKind::Keyword(Keyword::Fun) => {
+                let fun_span = self.advance().unwrap().span;
+                self.function_decl(Some(fun_span))
             }
             _ => self.statement(),
         }
@@ -121,6 +125,59 @@ where
                 init,
             },
             span: var_span.with_end_from(semi.span),
+            id: self.id_gen.next_id(),
+        })
+    }
+
+    fn function_decl(
+        &mut self,
+        fun_span: Option<Span>,
+    ) -> Result<Stmt<'src>, ParseError<'src>> {
+        let Token {
+            kind: TokenKind::Identifier(ident),
+            span: ident_span,
+        } = self.consume(&TokenKind::Identifier(""))?
+        else {
+            unreachable!();
+        };
+
+        self.consume(&TokenKind::LParen)?;
+
+        let mut params = Vec::new();
+
+        if !self.check_kind(&TokenKind::RParen) {
+            loop {
+                let Token {
+                    kind: TokenKind::Identifier(param_ident),
+                    span: _,
+                } = self.consume(&TokenKind::Identifier(""))?
+                else {
+                    unreachable!();
+                };
+                params.push(Identifier {
+                    symbol: param_ident,
+                });
+
+                if self.check_kind(&TokenKind::Comma) {
+                    self.advance().unwrap();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        self.consume(&TokenKind::RParen)?;
+
+        self.consume(&TokenKind::LBrace)?;
+        let (body, end_span) = self.block()?;
+
+        Ok(Stmt {
+            kind: StmtKind::Function(FunctionDecl {
+                name: Identifier { symbol: ident },
+                params,
+                body,
+            }),
+            span: fun_span.unwrap_or(ident_span).with_end_from(end_span),
             id: self.id_gen.next_id(),
         })
     }
@@ -612,9 +669,9 @@ where
             loop {
                 args.push(self.expression()?);
 
-                if let Some(token) = self.peek()
-                    && !matches!(token.kind, TokenKind::Comma)
-                {
+                if self.check_kind(&TokenKind::Comma) {
+                    self.advance().unwrap();
+                } else {
                     break;
                 }
             }
