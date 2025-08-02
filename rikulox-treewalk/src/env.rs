@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{error::RuntimeErrorKind, value::Value};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Environment<'src> {
     enclosing: Option<Rc<RefCell<Environment<'src>>>>,
     values: HashMap<&'src str, Value<'src>>,

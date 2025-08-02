@@ -23,6 +23,7 @@ pub trait Call<'src> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function<'src> {
     pub declaration: FunctionDecl<'src>,
+    pub closure: Rc<RefCell<Environment<'src>>>,
 }
 
 impl<'src> Call<'src> for Function<'src> {
@@ -46,7 +47,7 @@ impl<'src> Call<'src> for Function<'src> {
             });
         }
 
-        let mut env = Environment::with_enclosing(Rc::clone(&interp.globals));
+        let mut env = Environment::with_enclosing(Rc::clone(&self.closure));
 
         for (param, arg) in self.declaration.params.iter().zip(args) {
             env.define(param.symbol, arg.clone());

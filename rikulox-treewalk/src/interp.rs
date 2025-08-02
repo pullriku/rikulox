@@ -15,7 +15,6 @@ use crate::{
 };
 
 pub struct TreeWalkInterpreter<'src> {
-    pub(crate) globals: Rc<RefCell<Environment<'src>>>,
     env: Rc<RefCell<Environment<'src>>>,
 }
 
@@ -31,14 +30,12 @@ impl<'src> TreeWalkInterpreter<'src> {
         );
 
         Self {
-            globals: Rc::clone(&env),
             env,
         }
     }
 
     pub fn from_env(env: Rc<RefCell<Environment<'src>>>) -> Self {
         Self {
-            globals: Rc::clone(&env),
             env,
         }
     }
@@ -98,6 +95,7 @@ impl<'src> TreeWalkInterpreter<'src> {
                 let fun = Value::Object(Rc::new(RefCell::new(
                     Object::Function(Function {
                         declaration: declaration.clone(),
+                        closure: Rc::clone(&self.env),
                     }),
                 )));
 
