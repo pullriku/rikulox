@@ -1,7 +1,7 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
-    call::{Call, Class, Function, NativeFunction},
+    call::{Class, Function, NativeFunction},
     value::Value,
 };
 
@@ -10,21 +10,8 @@ pub enum Object<'src> {
     String(String),
     Function(Function<'src>),
     NativeFunction(NativeFunction),
-    Class(Class),
+    Class(Class<'src>),
     Instance(Instance<'src>),
-}
-
-impl<'src> Object<'src> {
-    pub fn as_call(&self) -> Option<&dyn Call<'src>> {
-        let f: &dyn Call = match self {
-            Object::Function(f) => f,
-            Object::NativeFunction(f) => f,
-            Object::Class(c) => c,
-            Object::String(_) | Object::Instance(_) => return None,
-        };
-
-        Some(f)
-    }
 }
 
 impl<'src> Display for Object<'src> {
@@ -41,13 +28,21 @@ impl<'src> Display for Object<'src> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Instance<'src> {
-    pub class: Class,
+    pub class: Rc<RefCell<Object<'src>>>,
     pub fields: HashMap<String, Value<'src>>,
 }
 
 impl<'src> Instance<'src> {
     pub fn get(&self, name: &str) -> Option<Value<'src>> {
-        self.fields.get(name).cloned()
+        let Object::Class(class) = &*self.class.borrow() else {
+            unreachable!()
+        };
+        let result = self.fields.get(name);
+        if result.is_none() {
+            class.find_method(name)
+        } else {
+            result.cloned()
+        }
     }
 
     pub fn set(&mut self, name: String, value: Value<'src>) {
@@ -57,6 +52,6 @@ impl<'src> Instance<'src> {
 
 impl<'src> Display for Instance<'src> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} instance", self.class)
+        write!(f, "{} instance", self.class.borrow())
     }
 }

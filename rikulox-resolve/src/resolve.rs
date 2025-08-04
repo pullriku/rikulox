@@ -106,6 +106,10 @@ impl<'src> Resolver<'src> {
             StmtKind::Class(class_decl) => {
                 self.declare(class_decl.name.symbol, *span)?;
                 self.define(class_decl.name.symbol);
+
+                for method in &class_decl.methods {
+                    self.resolve_function(method, FunctionKind::Method, *span)?;
+                }
             }
         }
 
@@ -261,4 +265,5 @@ impl<'src> Default for Resolver<'src> {
 enum FunctionKind {
     None,
     Function,
+    Method,
 }

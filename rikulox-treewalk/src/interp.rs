@@ -8,11 +8,11 @@ use rikulox_ast::{
 };
 
 use crate::{
-    call::{Class, Function},
+    call::{Class, Function, NativeFunction},
     env::Environment,
     error::{RuntimeError, RuntimeErrorKind},
     native::CLOCK_FN,
-    obj::Object,
+    obj::{Instance, Object},
     value::Value,
 };
 
@@ -128,10 +128,35 @@ impl<'src> TreeWalkInterpreter<'src> {
                     decl.name.symbol,
                     Value::Object(Rc::new(RefCell::new(Object::Class(
                         Class {
-                            name: decl.name.symbol.to_string(),
+                            name: decl.name.symbol,
+                            methods: HashMap::new(),
                         },
                     )))),
                 );
+
+                let mut methods = HashMap::new();
+                for method in &decl.methods {
+                    let fun = Function {
+                        declaration: method.clone(),
+                        closure: Rc::clone(&self.env),
+                    };
+
+                    methods.insert(method.name.symbol, fun);
+                }
+                let class = Value::Object(Rc::new(RefCell::new(
+                    Object::Class(Class {
+                        name: decl.name.symbol,
+                        methods,
+                    }),
+                )));
+
+                self.env
+                    .borrow_mut()
+                    .assign(decl.name.symbol, class)
+                    .map_err(|e| RuntimeError {
+                        kind: e,
+                        span: stmt.span,
+                    })?;
             }
         };
         Ok(())
@@ -242,20 +267,8 @@ impl<'src> TreeWalkInterpreter<'src> {
                     .map(|arg| self.eval(arg))
                     .collect::<Result<Vec<Value<'src>>, RuntimeError<'src>>>(
                     )?;
-                let Value::Object(callee) = callee else {
-                    return Err(RuntimeError {
-                        kind: RuntimeErrorKind::TypeError(expr.clone()),
-                        span: expr.span,
-                    });
-                };
 
-                let callee = callee.borrow();
-                let callee = callee.as_call().ok_or(RuntimeError {
-                    kind: RuntimeErrorKind::TypeError(expr.clone()),
-                    span: expr.span,
-                });
-
-                callee?.call(self, &args, expr.span)?
+                self.call(&callee, &args, expr)?
             }
             ExprKind::Get { object, name } => {
                 let object = self.eval(object.as_ref())?;
@@ -310,6 +323,102 @@ impl<'src> TreeWalkInterpreter<'src> {
         };
 
         Ok(object)
+    }
+
+    fn call(
+        &mut self,
+        callee: &Value<'src>,
+        args: &[Value<'src>],
+        call_expr: &Expr<'src>,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        let Value::Object(callee) = callee else {
+            return Err(RuntimeError {
+                kind: RuntimeErrorKind::TypeError(call_expr.clone()),
+                span: call_expr.span,
+            });
+        };
+        
+        match &*callee.borrow() {
+            Object::Function(function) => self.call_function(function, args, call_expr.span),
+            Object::NativeFunction(native_function) => self.call_native_function(native_function, args, call_expr.span),
+            Object::Class(_class) =>  self.call_class(callee, args),
+            Object::String(_) | Object::Instance(_) => Err(RuntimeError {
+                kind: RuntimeErrorKind::TypeError(call_expr.clone()),
+                span: call_expr.span,
+            })
+        }
+    }
+
+    fn call_function(
+        &mut self,
+        function: &Function<'src>,
+        args: &[Value<'src>],
+        call_span: Span,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        let arity =  function.declaration.params.len();
+        if  arity != args.len() {
+            return Err(RuntimeError {
+                kind: RuntimeErrorKind::Arity {
+                    expected: arity,
+                    actual: args.len(),
+                },
+                span: call_span,
+            });
+        }
+
+        let mut env = Environment::with_enclosing(Rc::clone(&function.closure));
+
+        for (param, arg) in function.declaration.params.iter().zip(args) {
+            env.define(param.symbol, arg.clone());
+        }
+
+        let result = self
+            .exec_block(&function.declaration.body, Rc::new(RefCell::new(env)));
+
+        if let Err(RuntimeError {
+            kind: RuntimeErrorKind::Return(value),
+            span: _,
+        }) = result
+        {
+            Ok(value)
+        } else {
+            result?;
+            Ok(Value::Nil)
+        }
+    }
+
+    fn call_native_function(
+        &mut self,
+        native_function: &NativeFunction,
+        args: &[Value<'src>],
+        call_span: Span,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        let arity  = native_function.arity;
+        if arity != args.len() {
+            return Err(RuntimeError {
+                kind: RuntimeErrorKind::Arity {
+                    expected: arity,
+                    actual: args.len(),
+                },
+                span: call_span,
+            });
+        }
+        (native_function.function)(self, args)
+    }
+
+    fn call_class(
+        &mut self,
+        callee: &Rc<RefCell<Object<'src>>>,
+        args: &[Value<'src>],
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        assert!(args.is_empty());
+
+        Ok(Value::Object(Rc::new(RefCell::new(Object::Instance(
+            Instance {
+                class: Rc::clone(callee),
+                fields: HashMap::new(),
+            },
+        )))))
     }
 
     fn binary_expr(

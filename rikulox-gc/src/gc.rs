@@ -5,6 +5,45 @@ use crate::{
     trace::{Trace, Tracer},
 };
 
+pub struct Gc<T: Trace, F, I>
+where
+    F: Fn() -> I,
+    I: Iterator<Item = EntryRef<T>>,
+{
+    heap: Heap<T>,
+    alloc_count: u32,
+    gc_threshold: u32,
+    get_roots: F,
+}
+
+impl<T: Trace, F, I> Gc<T, F, I>
+where
+    F: Fn() -> I,
+    I: Iterator<Item = EntryRef<T>>,
+{
+    pub fn new(gc_threshold: u32, get_roots: F) -> Self {
+        Self {
+            heap: Heap::new(),
+            alloc_count: 0,
+            gc_threshold,
+            get_roots,
+        }
+    }
+
+    pub fn alloc(&mut self, value: T) -> EntryRef<T> {
+        self.alloc_count += 1;
+
+        if self.alloc_count == self.gc_threshold {
+            self.alloc_count = 0;
+            let roots = (self.get_roots)();
+            self.heap.mark(roots);
+            self.heap.sweep();
+        }
+
+        self.heap.alloc(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Heap<T: Trace> {
     list: FreeList<T>,

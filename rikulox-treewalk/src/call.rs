@@ -1,53 +1,30 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
-use rikulox_ast::{span::Span, stmt::FunctionDecl};
+use rikulox_ast::stmt::FunctionDecl;
 
 use crate::{
     env::Environment,
-    error::{RuntimeError, RuntimeErrorKind},
+    error::RuntimeError,
     interp::TreeWalkInterpreter,
-    obj::{Instance, Object},
+    obj::Object,
     value::Value,
 };
 
-pub trait Call<'src> {
-    fn arity(&self) -> usize;
-    fn call(
-        &self,
-        interp: &mut TreeWalkInterpreter<'src>,
-        args: &[Value<'src>],
-        call_span: Span,
-    ) -> Result<Value<'src>, RuntimeError<'src>>;
-}
-
 #[derive(Debug, Clone, PartialEq)]
-pub struct Class {
-    pub name: String,
+pub struct Class<'src> {
+    pub name: &'src str,
+    pub methods: HashMap<&'src str, Function<'src>>,
 }
 
-impl<'src> Call<'src> for Class {
-    fn arity(&self) -> usize {
-        0
-    }
-
-    fn call(
-        &self,
-        _interp: &mut TreeWalkInterpreter<'src>,
-        args: &[Value<'src>],
-        _call_span: Span,
-    ) -> Result<Value<'src>, RuntimeError<'src>> {
-        assert!(args.is_empty());
-
-        Ok(Value::Object(Rc::new(RefCell::new(Object::Instance(
-            Instance {
-                class: self.clone(),
-                fields: HashMap::new(),
-            },
-        )))))
+impl<'src> Class<'src> {
+    pub fn find_method(&self, name: &str) -> Option<Value<'src>> {
+        self.methods.get(name).map(|f| {
+            Value::Object(Rc::new(RefCell::new(Object::Function(f.clone()))))
+        })
     }
 }
 
-impl Display for Class {
+impl<'src> Display for Class<'src> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
     }
@@ -57,49 +34,6 @@ impl Display for Class {
 pub struct Function<'src> {
     pub declaration: FunctionDecl<'src>,
     pub closure: Rc<RefCell<Environment<'src>>>,
-}
-
-impl<'src> Call<'src> for Function<'src> {
-    fn arity(&self) -> usize {
-        self.declaration.params.len()
-    }
-
-    fn call(
-        &self,
-        interp: &mut TreeWalkInterpreter<'src>,
-        args: &[Value<'src>],
-        call_span: Span,
-    ) -> Result<Value<'src>, RuntimeError<'src>> {
-        if self.arity() != args.len() {
-            return Err(RuntimeError {
-                kind: RuntimeErrorKind::Arity {
-                    expected: self.arity(),
-                    actual: args.len(),
-                },
-                span: call_span,
-            });
-        }
-
-        let mut env = Environment::with_enclosing(Rc::clone(&self.closure));
-
-        for (param, arg) in self.declaration.params.iter().zip(args) {
-            env.define(param.symbol, arg.clone());
-        }
-
-        let result = interp
-            .exec_block(&self.declaration.body, Rc::new(RefCell::new(env)));
-
-        if let Err(RuntimeError {
-            kind: RuntimeErrorKind::Return(value),
-            span: _,
-        }) = result
-        {
-            Ok(value)
-        } else {
-            result?;
-            Ok(Value::Nil)
-        }
-    }
 }
 
 impl<'src> Display for Function<'src> {
@@ -130,30 +64,6 @@ pub struct NativeFunction {
 impl NativeFunction {
     pub fn into_shared_object<'src>(self) -> Rc<RefCell<Object<'src>>> {
         Rc::new(RefCell::new(Object::NativeFunction(self)))
-    }
-}
-
-impl<'src> Call<'src> for NativeFunction {
-    fn arity(&self) -> usize {
-        self.arity
-    }
-
-    fn call(
-        &self,
-        interp: &mut TreeWalkInterpreter<'src>,
-        args: &[Value<'src>],
-        call_span: Span,
-    ) -> Result<Value<'src>, RuntimeError<'src>> {
-        if self.arity() != args.len() {
-            return Err(RuntimeError {
-                kind: RuntimeErrorKind::Arity {
-                    expected: self.arity,
-                    actual: args.len(),
-                },
-                span: call_span,
-            });
-        }
-        (self.function)(interp, args)
     }
 }
 
