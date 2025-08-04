@@ -107,6 +107,7 @@ impl<'src> TreeWalkInterpreter<'src> {
                     Object::Function(Function {
                         declaration: declaration.clone(),
                         closure: Rc::clone(&self.env),
+                        is_init: false,
                     }),
                 )));
 
@@ -139,6 +140,7 @@ impl<'src> TreeWalkInterpreter<'src> {
                     let fun = Function {
                         declaration: method.clone(),
                         closure: Rc::clone(&self.env),
+                        is_init: method.name.symbol == "init",
                     };
 
                     methods.insert(method.name.symbol, fun);
@@ -185,7 +187,7 @@ impl<'src> TreeWalkInterpreter<'src> {
         &mut self,
         expr: &Expr<'src>,
     ) -> Result<Value<'src>, RuntimeError<'src>> {
-        let object = match &expr.kind {
+        let value = match &expr.kind {
             ExprKind::Binary { left, op, right } => {
                 self.binary_expr(left.as_ref(), op, right.as_ref(), expr)?
             }
@@ -270,10 +272,10 @@ impl<'src> TreeWalkInterpreter<'src> {
 
                 self.call(&callee, &args, expr)?
             }
-            ExprKind::Get { object, name } => {
-                let object = self.eval(object.as_ref())?;
+            ExprKind::Get { left, name } => {
+                let value = self.eval(left.as_ref())?;
 
-                let Value::Object(object) = object else {
+                let Value::Object(object) = &value else {
                     return Err(RuntimeError {
                         kind: RuntimeErrorKind::TypeError(expr.clone()),
                         span: expr.span,
@@ -287,15 +289,17 @@ impl<'src> TreeWalkInterpreter<'src> {
                     });
                 };
 
-                instance.get(name.symbol).ok_or(RuntimeError {
-                    kind: RuntimeErrorKind::UndefinedProperty(
-                        name.symbol.to_string(),
-                    ),
-                    span: expr.span,
-                })?
+                instance.get(name.symbol, value.clone()).ok_or(
+                    RuntimeError {
+                        kind: RuntimeErrorKind::UndefinedProperty(
+                            name.symbol.to_string(),
+                        ),
+                        span: expr.span,
+                    },
+                )?
             }
             ExprKind::Set {
-                object,
+                left: object,
                 name,
                 value,
             } => {
@@ -320,9 +324,13 @@ impl<'src> TreeWalkInterpreter<'src> {
 
                 value
             }
+
+            ExprKind::This => {
+                self.lookup_variable("this", expr.id, expr.span)?.clone()
+            }
         };
 
-        Ok(object)
+        Ok(value)
     }
 
     fn call(
@@ -337,15 +345,21 @@ impl<'src> TreeWalkInterpreter<'src> {
                 span: call_expr.span,
             });
         };
-        
+
         match &*callee.borrow() {
-            Object::Function(function) => self.call_function(function, args, call_expr.span),
-            Object::NativeFunction(native_function) => self.call_native_function(native_function, args, call_expr.span),
-            Object::Class(_class) =>  self.call_class(callee, args),
+            Object::Function(function) => {
+                self.call_function(function, args, call_expr.span)
+            }
+            Object::NativeFunction(native_function) => {
+                self.call_native_function(native_function, args, call_expr.span)
+            }
+            Object::Class(class) => {
+                self.call_class(class, callee, args, call_expr.span)
+            }
             Object::String(_) | Object::Instance(_) => Err(RuntimeError {
                 kind: RuntimeErrorKind::TypeError(call_expr.clone()),
                 span: call_expr.span,
-            })
+            }),
         }
     }
 
@@ -355,8 +369,8 @@ impl<'src> TreeWalkInterpreter<'src> {
         args: &[Value<'src>],
         call_span: Span,
     ) -> Result<Value<'src>, RuntimeError<'src>> {
-        let arity =  function.declaration.params.len();
-        if  arity != args.len() {
+        let arity = function.declaration.params.len();
+        if arity != args.len() {
             return Err(RuntimeError {
                 kind: RuntimeErrorKind::Arity {
                     expected: arity,
@@ -381,9 +395,16 @@ impl<'src> TreeWalkInterpreter<'src> {
         }) = result
         {
             Ok(value)
+        } else if function.is_init {
+            Ok(function.closure.borrow().get_at("this", 0).unwrap())
         } else {
             result?;
-            Ok(Value::Nil)
+
+            if function.is_init {
+                Ok(function.closure.borrow().get_at("this", 0).unwrap())
+            } else {
+                Ok(Value::Nil)
+            }
         }
     }
 
@@ -393,7 +414,7 @@ impl<'src> TreeWalkInterpreter<'src> {
         args: &[Value<'src>],
         call_span: Span,
     ) -> Result<Value<'src>, RuntimeError<'src>> {
-        let arity  = native_function.arity;
+        let arity = native_function.arity;
         if arity != args.len() {
             return Err(RuntimeError {
                 kind: RuntimeErrorKind::Arity {
@@ -408,17 +429,26 @@ impl<'src> TreeWalkInterpreter<'src> {
 
     fn call_class(
         &mut self,
+        class: &Class<'src>,
         callee: &Rc<RefCell<Object<'src>>>,
         args: &[Value<'src>],
+        call_span: Span,
     ) -> Result<Value<'src>, RuntimeError<'src>> {
         assert!(args.is_empty());
 
-        Ok(Value::Object(Rc::new(RefCell::new(Object::Instance(
-            Instance {
+        let instance =
+            Value::Object(Rc::new(RefCell::new(Object::Instance(Instance {
                 class: Rc::clone(callee),
                 fields: HashMap::new(),
-            },
-        )))))
+            }))));
+
+        let init = class.find_method("init").cloned();
+        if let Some(mut init) = init {
+            init.bind(instance.clone());
+            self.call_function(&init, args, call_span)?;
+        }
+
+        Ok(instance)
     }
 
     fn binary_expr(

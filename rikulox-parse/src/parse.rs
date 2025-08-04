@@ -186,7 +186,7 @@ where
                 params,
                 body,
             },
-            end_span,
+            fun_span.unwrap_or(ident_span).with_end_from(end_span),
         ))
     }
 
@@ -515,10 +515,10 @@ where
                     span: expr.span.with_end_from(token_eq.span),
                     id: self.id_gen.next_id(),
                 })
-            } else if let ExprKind::Get { object, name } = expr.kind {
+            } else if let ExprKind::Get { left: object, name } = expr.kind {
                 Ok(Expr {
                     kind: ExprKind::Set {
-                        object,
+                        left: object,
                         name,
                         value: Box::new(value),
                     },
@@ -760,7 +760,7 @@ where
 
                     expr = Expr {
                         kind: ExprKind::Get {
-                            object: Box::new(expr),
+                            left: Box::new(expr),
                             name: Identifier { symbol: ident },
                         },
                         span: expr_span.with_end_from(ident_span),
@@ -825,6 +825,11 @@ where
                 },
                 Keyword::Nil => Expr {
                     kind: ExprKind::Literal(Literal::Nil),
+                    span: token.span,
+                    id: self.id_gen.next_id(),
+                },
+                Keyword::This => Expr {
+                    kind: ExprKind::This,
                     span: token.span,
                     id: self.id_gen.next_id(),
                 },

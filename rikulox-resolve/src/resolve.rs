@@ -13,6 +13,7 @@ pub struct Resolver<'src> {
     scopes: Vec<HashMap<&'src str, bool>>,
     locals: HashMap<NodeId, usize>,
     current_function: FunctionKind,
+    current_class: ClassKind,
 }
 
 impl<'src> Resolver<'src> {
@@ -21,6 +22,7 @@ impl<'src> Resolver<'src> {
             scopes: vec![],
             locals: HashMap::new(),
             current_function: FunctionKind::None,
+            current_class: ClassKind::None,
         }
     }
 
@@ -99,17 +101,40 @@ impl<'src> Resolver<'src> {
                 }
 
                 if let Some(expr) = expr {
+                    if self.current_function == FunctionKind::Init {
+                        return Err(ResolveError {
+                            kind: ResolveErrorKind::ReturnInInit,
+                            span: *span,
+                        });
+                    }
+
                     self.expression(expr)?;
                 }
             }
 
             StmtKind::Class(class_decl) => {
+                let enclosing_class =
+                    mem::replace(&mut self.current_class, ClassKind::Class);
+
                 self.declare(class_decl.name.symbol, *span)?;
                 self.define(class_decl.name.symbol);
 
+                self.begin_scope();
+
+                self.scopes.last_mut().unwrap().insert("this", true);
+
                 for method in &class_decl.methods {
-                    self.resolve_function(method, FunctionKind::Method, *span)?;
+                    let func_kind = if method.name.symbol == "init" {
+                        FunctionKind::Init
+                    } else {
+                        FunctionKind::Method
+                    };
+                    self.resolve_function(method, func_kind, *span)?;
                 }
+
+                self.end_scope();
+
+                self.current_class = enclosing_class;
             }
         }
 
@@ -164,16 +189,28 @@ impl<'src> Resolver<'src> {
                     self.expression(arg)?;
                 }
             }
-            ExprKind::Get { object, name: _ } => {
+            ExprKind::Get {
+                left: object,
+                name: _,
+            } => {
                 self.expression(object)?;
             }
             ExprKind::Set {
-                object,
+                left: object,
                 name: _,
                 value,
             } => {
                 self.expression(object)?;
                 self.expression(value)?;
+            }
+            ExprKind::This => {
+                if self.current_class == ClassKind::None {
+                    return Err(ResolveError {
+                        kind: ResolveErrorKind::ThisOutsideClass,
+                        span: *span,
+                    });
+                }
+                self.resolve_local(*id, "this");
             }
         }
 
@@ -265,5 +302,12 @@ impl<'src> Default for Resolver<'src> {
 enum FunctionKind {
     None,
     Function,
+    Init,
     Method,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum ClassKind {
+    None,
+    Class,
 }

@@ -33,13 +33,20 @@ pub struct Instance<'src> {
 }
 
 impl<'src> Instance<'src> {
-    pub fn get(&self, name: &str) -> Option<Value<'src>> {
+    pub fn get(
+        &self,
+        name: &str,
+        self_ref: Value<'src>,
+    ) -> Option<Value<'src>> {
         let Object::Class(class) = &*self.class.borrow() else {
             unreachable!()
         };
         let result = self.fields.get(name);
         if result.is_none() {
-            class.find_method(name)
+            class.find_method(name).cloned().map(|mut m| {
+                m.bind(self_ref.clone());
+                Value::Object(Rc::new(RefCell::new(Object::Function(m))))
+            })
         } else {
             result.cloned()
         }

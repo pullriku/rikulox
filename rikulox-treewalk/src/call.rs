@@ -3,11 +3,8 @@ use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 use rikulox_ast::stmt::FunctionDecl;
 
 use crate::{
-    env::Environment,
-    error::RuntimeError,
-    interp::TreeWalkInterpreter,
-    obj::Object,
-    value::Value,
+    env::Environment, error::RuntimeError, interp::TreeWalkInterpreter,
+    obj::Object, value::Value,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,10 +14,8 @@ pub struct Class<'src> {
 }
 
 impl<'src> Class<'src> {
-    pub fn find_method(&self, name: &str) -> Option<Value<'src>> {
-        self.methods.get(name).map(|f| {
-            Value::Object(Rc::new(RefCell::new(Object::Function(f.clone()))))
-        })
+    pub fn find_method(&self, name: &str) -> Option<&Function<'src>> {
+        self.methods.get(name)
     }
 }
 
@@ -34,6 +29,16 @@ impl<'src> Display for Class<'src> {
 pub struct Function<'src> {
     pub declaration: FunctionDecl<'src>,
     pub closure: Rc<RefCell<Environment<'src>>>,
+    pub is_init: bool,
+}
+
+impl<'src> Function<'src> {
+    pub fn bind(&mut self, instance: Value<'src>) {
+        let mut env = Environment::with_enclosing(Rc::clone(&self.closure));
+        env.define("this", instance);
+
+        self.closure = Rc::new(RefCell::new(env));
+    }
 }
 
 impl<'src> Display for Function<'src> {
