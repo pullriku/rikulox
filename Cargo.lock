@@ -155,7 +155,6 @@ dependencies = [
  "rikulox-lex",
  "rikulox-parse",
  "rikulox-resolve",
- "rikulox-runtime",
  "rikulox-treewalk",
 ]
 

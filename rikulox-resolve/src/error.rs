@@ -11,4 +11,6 @@ pub enum ResolveErrorKind {
     UninitializedVariable(String),
     VariableAlreadyDeclared(String),
     ReturnOutsideFunction,
+    ThisOutsideClass,
+    ReturnInInit,
 }

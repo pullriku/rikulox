@@ -8,11 +8,11 @@ use rikulox_ast::{
 };
 
 use crate::{
-    call::Function,
+    call::{Class, Function, NativeFunction},
     env::Environment,
     error::{RuntimeError, RuntimeErrorKind},
     native::CLOCK_FN,
-    obj::Object,
+    obj::{Instance, Object},
     value::Value,
 };
 
@@ -107,6 +107,7 @@ impl<'src> TreeWalkInterpreter<'src> {
                     Object::Function(Function {
                         declaration: declaration.clone(),
                         closure: Rc::clone(&self.env),
+                        is_init: false,
                     }),
                 )));
 
@@ -122,6 +123,42 @@ impl<'src> TreeWalkInterpreter<'src> {
                     kind: RuntimeErrorKind::Return(value),
                     span: stmt.span,
                 });
+            }
+            StmtKind::Class(decl) => {
+                self.env.borrow_mut().define(
+                    decl.name.symbol,
+                    Value::Object(Rc::new(RefCell::new(Object::Class(
+                        Class {
+                            name: decl.name.symbol,
+                            methods: HashMap::new(),
+                        },
+                    )))),
+                );
+
+                let mut methods = HashMap::new();
+                for method in &decl.methods {
+                    let fun = Function {
+                        declaration: method.clone(),
+                        closure: Rc::clone(&self.env),
+                        is_init: method.name.symbol == "init",
+                    };
+
+                    methods.insert(method.name.symbol, fun);
+                }
+                let class = Value::Object(Rc::new(RefCell::new(
+                    Object::Class(Class {
+                        name: decl.name.symbol,
+                        methods,
+                    }),
+                )));
+
+                self.env
+                    .borrow_mut()
+                    .assign(decl.name.symbol, class)
+                    .map_err(|e| RuntimeError {
+                        kind: e,
+                        span: stmt.span,
+                    })?;
             }
         };
         Ok(())
@@ -150,7 +187,7 @@ impl<'src> TreeWalkInterpreter<'src> {
         &mut self,
         expr: &Expr<'src>,
     ) -> Result<Value<'src>, RuntimeError<'src>> {
-        let object = match &expr.kind {
+        let value = match &expr.kind {
             ExprKind::Binary { left, op, right } => {
                 self.binary_expr(left.as_ref(), op, right.as_ref(), expr)?
             }
@@ -232,24 +269,186 @@ impl<'src> TreeWalkInterpreter<'src> {
                     .map(|arg| self.eval(arg))
                     .collect::<Result<Vec<Value<'src>>, RuntimeError<'src>>>(
                     )?;
-                let Value::Object(callee) = callee else {
+
+                self.call(&callee, &args, expr)?
+            }
+            ExprKind::Get { left, name } => {
+                let value = self.eval(left.as_ref())?;
+
+                let Value::Object(object) = &value else {
                     return Err(RuntimeError {
                         kind: RuntimeErrorKind::TypeError(expr.clone()),
                         span: expr.span,
                     });
                 };
 
-                let callee = callee.borrow();
-                let callee = callee.as_call().ok_or(RuntimeError {
-                    kind: RuntimeErrorKind::TypeError(expr.clone()),
-                    span: expr.span,
-                });
+                let Object::Instance(instance) = &*object.borrow() else {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::TypeError(expr.clone()),
+                        span: expr.span,
+                    });
+                };
 
-                callee?.call(self, &args, expr.span)?
+                instance.get(name.symbol, value.clone()).ok_or(
+                    RuntimeError {
+                        kind: RuntimeErrorKind::UndefinedProperty(
+                            name.symbol.to_string(),
+                        ),
+                        span: expr.span,
+                    },
+                )?
+            }
+            ExprKind::Set {
+                left: object,
+                name,
+                value,
+            } => {
+                let value = self.eval(value.as_ref())?;
+
+                let Value::Object(object) = self.eval(object.as_ref())? else {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::TypeError(expr.clone()),
+                        span: expr.span,
+                    });
+                };
+
+                let Object::Instance(instance) = &mut *object.borrow_mut()
+                else {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::TypeError(expr.clone()),
+                        span: expr.span,
+                    });
+                };
+
+                instance.set(name.symbol.to_string(), value.clone());
+
+                value
+            }
+
+            ExprKind::This => {
+                self.lookup_variable("this", expr.id, expr.span)?.clone()
             }
         };
 
-        Ok(object)
+        Ok(value)
+    }
+
+    fn call(
+        &mut self,
+        callee: &Value<'src>,
+        args: &[Value<'src>],
+        call_expr: &Expr<'src>,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        let Value::Object(callee) = callee else {
+            return Err(RuntimeError {
+                kind: RuntimeErrorKind::TypeError(call_expr.clone()),
+                span: call_expr.span,
+            });
+        };
+
+        match &*callee.borrow() {
+            Object::Function(function) => {
+                self.call_function(function, args, call_expr.span)
+            }
+            Object::NativeFunction(native_function) => {
+                self.call_native_function(native_function, args, call_expr.span)
+            }
+            Object::Class(class) => {
+                self.call_class(class, callee, args, call_expr.span)
+            }
+            Object::String(_) | Object::Instance(_) => Err(RuntimeError {
+                kind: RuntimeErrorKind::TypeError(call_expr.clone()),
+                span: call_expr.span,
+            }),
+        }
+    }
+
+    fn call_function(
+        &mut self,
+        function: &Function<'src>,
+        args: &[Value<'src>],
+        call_span: Span,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        let arity = function.declaration.params.len();
+        if arity != args.len() {
+            return Err(RuntimeError {
+                kind: RuntimeErrorKind::Arity {
+                    expected: arity,
+                    actual: args.len(),
+                },
+                span: call_span,
+            });
+        }
+
+        let mut env = Environment::with_enclosing(Rc::clone(&function.closure));
+
+        for (param, arg) in function.declaration.params.iter().zip(args) {
+            env.define(param.symbol, arg.clone());
+        }
+
+        let result = self
+            .exec_block(&function.declaration.body, Rc::new(RefCell::new(env)));
+
+        if let Err(RuntimeError {
+            kind: RuntimeErrorKind::Return(value),
+            span: _,
+        }) = result
+        {
+            Ok(value)
+        } else if function.is_init {
+            Ok(function.closure.borrow().get_at("this", 0).unwrap())
+        } else {
+            result?;
+
+            if function.is_init {
+                Ok(function.closure.borrow().get_at("this", 0).unwrap())
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+    }
+
+    fn call_native_function(
+        &mut self,
+        native_function: &NativeFunction,
+        args: &[Value<'src>],
+        call_span: Span,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        let arity = native_function.arity;
+        if arity != args.len() {
+            return Err(RuntimeError {
+                kind: RuntimeErrorKind::Arity {
+                    expected: arity,
+                    actual: args.len(),
+                },
+                span: call_span,
+            });
+        }
+        (native_function.function)(self, args)
+    }
+
+    fn call_class(
+        &mut self,
+        class: &Class<'src>,
+        callee: &Rc<RefCell<Object<'src>>>,
+        args: &[Value<'src>],
+        call_span: Span,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        assert!(args.is_empty());
+
+        let instance =
+            Value::Object(Rc::new(RefCell::new(Object::Instance(Instance {
+                class: Rc::clone(callee),
+                fields: HashMap::new(),
+            }))));
+
+        let init = class.find_method("init").cloned();
+        if let Some(mut init) = init {
+            init.bind(instance.clone());
+            self.call_function(&init, args, call_span)?;
+        }
+
+        Ok(instance)
     }
 
     fn binary_expr(

@@ -38,6 +38,16 @@ pub enum ExprKind<'src> {
         callee: Box<Expr<'src>>,
         args: Vec<Expr<'src>>,
     },
+    Get {
+        left: Box<Expr<'src>>,
+        name: Identifier<'src>,
+    },
+    Set {
+        left: Box<Expr<'src>>,
+        name: Identifier<'src>,
+        value: Box<Expr<'src>>,
+    },
+    This,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

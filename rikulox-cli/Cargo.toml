@@ -1,8 +1,9 @@
 [package]
 name = "rikulox-cli"
+version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
-version.workspace = true
+# version.workspace = true
 readme.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -18,5 +19,4 @@ clap = { version = "4.5.41", features = ["derive"] }
 rikulox-parse = { version = "0.1.0", path = "../rikulox-parse" }
 rikulox-lex = { version = "0.1.0", path = "../rikulox-lex" }
 rikulox-treewalk = { version = "0.1.0", path = "../rikulox-treewalk" }
-rikulox-runtime = { version = "0.1.0", path = "../rikulox-runtime" }
 rikulox-resolve = { version = "0.1.0", path = "../rikulox-resolve" }
