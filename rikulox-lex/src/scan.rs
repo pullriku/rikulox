@@ -269,3 +269,153 @@ impl<'src> Iterator for Scanner<'src> {
         self.scan_token()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rikulox_ast::token::{Keyword, TokenKind};
+
+    #[test]
+    fn new_initializes_scanner() {
+        let src = "abc";
+        let scanner = Scanner::new(src);
+        assert_eq!(scanner.source, src);
+        assert_eq!(scanner.start, 0);
+        assert_eq!(scanner.current, 0);
+        assert_eq!(scanner.line, 1);
+        assert_eq!(scanner.column, 1);
+        assert_eq!(scanner.start_line, 1);
+        assert_eq!(scanner.start_column, 1);
+    }
+
+    #[test]
+    fn advance_and_peek_update_positions() {
+        let mut scanner = Scanner::new("a\nb");
+        assert_eq!(scanner.peek(), Some('a'));
+        assert_eq!(scanner.peek_next(), Some('\n'));
+        assert_eq!(scanner.advance(), Some('a'));
+        assert_eq!(scanner.line, 1);
+        assert_eq!(scanner.column, 2);
+        assert_eq!(scanner.advance(), Some('\n'));
+        assert_eq!(scanner.line, 2);
+        assert_eq!(scanner.column, 0);
+        assert_eq!(scanner.peek(), Some('b'));
+        assert_eq!(scanner.advance(), Some('b'));
+        assert_eq!(scanner.line, 2);
+        assert_eq!(scanner.column, 1);
+    }
+
+    #[test]
+    fn match_char_advances_on_match() {
+        let mut scanner = Scanner::new("==");
+        scanner.advance(); // consume first '='
+        assert!(scanner.match_char('='));
+        assert_eq!(scanner.current, 2);
+        assert!(!scanner.match_char('='));
+    }
+
+    #[test]
+    fn is_comment_detects_comment() {
+        let mut scanner = Scanner::new("// comment");
+        assert!(scanner.is_comment());
+    }
+
+    #[test]
+    fn skip_ignores_whitespace_and_comments() {
+        let mut scanner = Scanner::new("  \nabc");
+        Scanner::skip(&mut scanner);
+        assert_eq!(scanner.peek(), Some('a'));
+        assert_eq!(scanner.line, 2);
+    }
+
+    #[test]
+    fn string_literal_scanned() {
+        let mut scanner = Scanner::new("\"foo\"");
+        scanner.advance(); // opening quote
+        let token = scanner.string().unwrap();
+        assert_eq!(token.kind, TokenKind::String("foo"));
+        assert_eq!(token.span.start, 0);
+        assert_eq!(token.span.end, 5);
+    }
+
+    #[test]
+    fn unterminated_string_returns_error() {
+        let mut scanner = Scanner::new("\"foo");
+        scanner.advance(); // opening quote
+        let error = scanner.string().unwrap_err();
+        assert!(matches!(error.kind, ScanErrorKind::UnterminatedString));
+    }
+
+    #[test]
+    fn number_literal_scanned() {
+        let mut scanner = Scanner::new("123");
+        scanner.advance(); // first digit
+        let token = scanner.number().unwrap();
+        assert!(
+            matches!(token.kind, TokenKind::Number(n) if (n - 123.0).abs() < f64::EPSILON)
+        );
+        assert_eq!(token.span.start, 0);
+        assert_eq!(token.span.end, 3);
+    }
+
+    #[test]
+    fn float_literal_scanned() {
+        let mut scanner = Scanner::new("123.456");
+        scanner.advance();
+        let token = scanner.number().unwrap();
+        assert!(
+            matches!(token.kind, TokenKind::Number(n) if (n - 123.456).abs() < f64::EPSILON)
+        );
+    }
+
+    #[test]
+    fn identifier_and_keyword_scanned() {
+        // identifier
+        let mut scanner = Scanner::new("foo");
+        scanner.advance();
+        let token = scanner.identifier().unwrap();
+        assert_eq!(token.kind, TokenKind::Identifier("foo"));
+
+        // keyword
+        let mut scanner = Scanner::new("for");
+        scanner.advance();
+        let token = scanner.identifier().unwrap();
+        assert_eq!(token.kind, TokenKind::Keyword(Keyword::For));
+    }
+
+    #[test]
+    fn scan_token_recognizes_punctuation() {
+        let mut scanner = Scanner::new("()");
+        let first = scanner.scan_token().unwrap().unwrap();
+        assert_eq!(first.kind, TokenKind::LParen);
+        let second = scanner.scan_token().unwrap().unwrap();
+        assert_eq!(second.kind, TokenKind::RParen);
+        assert!(scanner.scan_token().is_none());
+    }
+
+    #[test]
+    fn scan_tokens_collects_tokens_and_errors() {
+        let mut scanner = Scanner::new("( @ 123");
+        let result = scanner.scan_tokens();
+        assert_eq!(result.tokens[0].kind, TokenKind::LParen);
+        assert!(
+            result
+                .tokens
+                .iter()
+                .any(|t| matches!(t.kind, TokenKind::Number(_)))
+        );
+        assert_eq!(result.errors.len(), 1);
+        assert!(matches!(
+            result.errors[0].kind,
+            ScanErrorKind::UnexpectedCharacter('@')
+        ));
+    }
+
+    #[test]
+    fn iterator_over_scanner_yields_tokens() {
+        let mut scanner = Scanner::new("+-");
+        assert_eq!(scanner.next().unwrap().unwrap().kind, TokenKind::Plus);
+        assert_eq!(scanner.next().unwrap().unwrap().kind, TokenKind::Minus);
+        assert!(scanner.next().is_none());
+    }
+}
