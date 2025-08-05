@@ -1,7 +1,10 @@
 use std::iter::Peekable;
 
 use rikulox_ast::{
-    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
+    expr::{
+        BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp,
+        Variable,
+    },
     id::IdGen,
     span::Span,
     stmt::{ClassDecl, FunctionDecl, Stmt, StmtKind},
@@ -69,24 +72,25 @@ where
         &mut self,
         var_span: Span,
     ) -> Result<Stmt<'src>, ParseError<'src>> {
-        let name_symbol = match self.peek_or_err(ExpectedItem::Ident)? {
-            &Token {
-                kind: TokenKind::Identifier(name),
-                ..
-            } => {
-                self.advance().unwrap();
-                name
-            }
-            unexpected => {
-                return Err(ParseError {
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: ExpectedItem::Ident,
-                        found: unexpected.kind,
-                    },
-                    span: unexpected.span,
-                });
-            }
-        };
+        let (name_symbol, name_span) =
+            match self.peek_or_err(ExpectedItem::Ident)? {
+                &Token {
+                    kind: TokenKind::Identifier(name),
+                    span,
+                } => {
+                    self.advance().unwrap();
+                    (name, span)
+                }
+                unexpected => {
+                    return Err(ParseError {
+                        kind: ParseErrorKind::UnexpectedToken {
+                            expected: ExpectedItem::Ident,
+                            found: unexpected.kind,
+                        },
+                        span: unexpected.span,
+                    });
+                }
+            };
 
         let init = match self.peek() {
             Some(Token {
@@ -130,6 +134,7 @@ where
             kind: StmtKind::Var {
                 name: Identifier {
                     symbol: name_symbol,
+                    span: name_span,
                 },
                 init,
             },
@@ -165,6 +170,7 @@ where
                 };
                 params.push(Identifier {
                     symbol: param_ident,
+                    span: ident_span,
                 });
 
                 if self.check_kind(&TokenKind::Comma) {
@@ -182,7 +188,10 @@ where
 
         Ok((
             FunctionDecl {
-                name: Identifier { symbol: ident },
+                name: Identifier {
+                    symbol: ident,
+                    span: ident_span,
+                },
                 params,
                 body,
             },
@@ -194,23 +203,41 @@ where
         &mut self,
         class_span: Span,
     ) -> Result<Stmt<'src>, ParseError<'src>> {
-        let name = match self.peek_or_err(ExpectedItem::Ident)? {
-            &Token {
-                kind: TokenKind::Identifier(name),
+        let &Token {
+            kind: TokenKind::Identifier(name),
+            span: ident_span,
+        } = self.peek_or_err(ExpectedItem::Ident)?
+        else {
+            return Err(ParseError {
+                kind: ParseErrorKind::UnexpectedToken {
+                    expected: ExpectedItem::Ident,
+                    found: self.peek_or_err(ExpectedItem::Ident)?.kind,
+                },
+                span: self.peek_span(),
+            });
+        };
+
+        let superclass = match self.peek() {
+            Some(Token {
+                kind: TokenKind::Less,
                 ..
-            } => {
+            }) => {
                 self.advance().unwrap();
-                name
-            }
-            unexpected => {
-                return Err(ParseError {
-                    kind: ParseErrorKind::UnexpectedToken {
-                        expected: ExpectedItem::Ident,
-                        found: unexpected.kind,
+                let Token {
+                    kind: TokenKind::Identifier(name),
+                    span: _,
+                } = self.consume(&TokenKind::Identifier(""))?
+                else {
+                    unreachable!();
+                };
+                Some(Variable {
+                    ident: Identifier {
+                        symbol: name,
+                        span: ident_span,
                     },
-                    span: unexpected.span,
-                });
+                })
             }
+            _ => None,
         };
 
         self.consume(&TokenKind::LBrace)?;
@@ -228,7 +255,11 @@ where
 
         Ok(Stmt {
             kind: StmtKind::Class(ClassDecl {
-                name: Identifier { symbol: name },
+                name: Identifier {
+                    symbol: name,
+                    span: ident_span,
+                },
+                superclass,
                 methods,
             }),
             span: class_span.with_end_from(r_brace.span),
@@ -509,7 +540,7 @@ where
             if let ExprKind::Variable(ident) = expr.kind {
                 Ok(Expr {
                     kind: ExprKind::Assign {
-                        name: ident,
+                        name: ident.ident,
                         value: Box::new(value),
                     },
                     span: expr.span.with_end_from(token_eq.span),
@@ -761,7 +792,10 @@ where
                     expr = Expr {
                         kind: ExprKind::Get {
                             left: Box::new(expr),
-                            name: Identifier { symbol: ident },
+                            name: Identifier {
+                                symbol: ident,
+                                span: ident_span,
+                            },
                         },
                         span: expr_span.with_end_from(ident_span),
                         id: self.id_gen.next_id(),
@@ -844,7 +878,12 @@ where
                 }
             },
             TokenKind::Identifier(symbol) => Expr {
-                kind: ExprKind::Variable(Identifier { symbol }),
+                kind: ExprKind::Variable(Variable {
+                    ident: Identifier {
+                        symbol,
+                        span: token.span,
+                    },
+                }),
                 span: token.span,
                 id: self.id_gen.next_id(),
             },

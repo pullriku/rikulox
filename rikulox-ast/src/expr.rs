@@ -24,7 +24,7 @@ pub enum ExprKind<'src> {
     },
     Grouping(Box<Expr<'src>>),
     Literal(Literal<'src>),
-    Variable(Identifier<'src>),
+    Variable(Variable<'src>),
     Assign {
         name: Identifier<'src>,
         value: Box<Expr<'src>>,
@@ -53,6 +53,12 @@ pub enum ExprKind<'src> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier<'src> {
     pub symbol: &'src str,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Variable<'src> {
+    pub ident: Identifier<'src>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

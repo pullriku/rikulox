@@ -13,4 +13,5 @@ pub enum ResolveErrorKind {
     ReturnOutsideFunction,
     ThisOutsideClass,
     ReturnInInit,
+    ClassCannotExtendItself,
 }

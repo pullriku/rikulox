@@ -1,5 +1,5 @@
 use crate::{
-    expr::{Expr, Identifier},
+    expr::{Expr, Identifier, Variable},
     id::NodeId,
     span::Span,
 };
@@ -44,5 +44,6 @@ pub struct FunctionDecl<'src> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClassDecl<'src> {
     pub name: Identifier<'src>,
+    pub superclass: Option<Variable<'src>>,
     pub methods: Vec<FunctionDecl<'src>>,
 }

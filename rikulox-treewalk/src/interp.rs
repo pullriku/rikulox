@@ -1,7 +1,10 @@
 use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use rikulox_ast::{
-    expr::{BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp},
+    expr::{
+        BinOp, Expr, ExprKind, Identifier, Literal, LogicalOp, UnaryOp,
+        Variable,
+    },
     id::NodeId,
     span::Span,
     stmt::{Stmt, StmtKind},
@@ -70,7 +73,7 @@ impl<'src> TreeWalkInterpreter<'src> {
                 println!("{}", self.eval(expr)?);
             }
             StmtKind::Var {
-                name: Identifier { symbol },
+                name: Identifier { symbol, span: _ },
                 init,
             } => {
                 let value = match init {
@@ -125,6 +128,17 @@ impl<'src> TreeWalkInterpreter<'src> {
                 });
             }
             StmtKind::Class(decl) => {
+                let superclass = decl
+                    .superclass
+                    .as_ref()
+                    .map(|superclass| -> Result<Value<'src>, RuntimeError<'src>> {
+                        self.eval_variable(&superclass, stmt.id, stmt.span)?;
+                        
+
+                        todo!()
+                    })
+                    .transpose()?;
+
                 self.env.borrow_mut().define(
                     decl.name.symbol,
                     Value::Object(Rc::new(RefCell::new(Object::Class(
@@ -215,9 +229,7 @@ impl<'src> TreeWalkInterpreter<'src> {
                 Literal::Nil => Value::Nil,
                 Literal::Bool(bool) => Value::Bool(*bool),
             },
-            ExprKind::Variable(identifier) => {
-                self.lookup_variable(identifier.symbol, expr.id, expr.span)?
-            }
+            ExprKind::Variable(var) => self.eval_variable(var, expr.id, expr.span)?,
             ExprKind::Assign { name, value } => {
                 let value = self.eval(value.as_ref())?;
                 let name = name.symbol;
@@ -331,6 +343,15 @@ impl<'src> TreeWalkInterpreter<'src> {
         };
 
         Ok(value)
+    }
+
+    fn eval_variable(
+        &mut self,
+        var: &Variable<'src>,
+        id: NodeId,
+        span: Span,
+    ) -> Result<Value<'src>, RuntimeError<'src>> {
+        self.lookup_variable(var.ident.symbol, id, span)
     }
 
     fn call(

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, mem};
 
 use rikulox_ast::{
-    expr::{Expr, ExprKind},
+    expr::{Expr, ExprKind, Variable},
     id::NodeId,
     span::Span,
     stmt::{FunctionDecl, Stmt, StmtKind},
@@ -50,7 +50,7 @@ impl<'src> Resolver<'src> {
     }
 
     fn statement(&mut self, stmt: &Stmt<'src>) -> Result<(), ResolveError> {
-        let Stmt { kind, span, id: _ } = stmt;
+        let Stmt { kind, span, id } = stmt;
         match kind {
             StmtKind::Expression(expr) => self.expression(expr)?,
             StmtKind::Print(expr) => self.expression(expr)?,
@@ -119,6 +119,17 @@ impl<'src> Resolver<'src> {
                 self.declare(class_decl.name.symbol, *span)?;
                 self.define(class_decl.name.symbol);
 
+                if let Some(superclass_var) = &class_decl.superclass {
+                    if class_decl.name.symbol == superclass_var.ident.symbol {
+                        return Err(ResolveError {
+                            kind: ResolveErrorKind::ClassCannotExtendItself,
+                            span: *span,
+                        });
+                    }
+
+                    self.resolve_variable(superclass_var, *span, *id)?;
+                }
+
                 self.begin_scope();
 
                 self.scopes.last_mut().unwrap().insert("this", true);
@@ -152,28 +163,8 @@ impl<'src> Resolver<'src> {
             ExprKind::Unary { op: _, right } => self.expression(right)?,
             ExprKind::Grouping(expr) => self.expression(expr)?,
             ExprKind::Literal(_) => (),
-            ExprKind::Variable(identifier) => {
-                if !self.scopes.is_empty()
-                    && self
-                        .scopes
-                        .last()
-                        .unwrap()
-                        .contains_key(&identifier.symbol)
-                    && !self
-                        .scopes
-                        .last()
-                        .unwrap()
-                        .get(&identifier.symbol)
-                        .unwrap()
-                {
-                    return Err(ResolveError {
-                        kind: ResolveErrorKind::UninitializedVariable(
-                            identifier.symbol.to_string(),
-                        ),
-                        span: *span,
-                    });
-                }
-                self.resolve_local(*id, identifier.symbol);
+            ExprKind::Variable(var) => {
+                self.resolve_variable(var, *span, *id)?;
             }
             ExprKind::Assign { name, value } => {
                 self.expression(value)?;
@@ -253,6 +244,29 @@ impl<'src> Resolver<'src> {
             return;
         };
         scope.insert(name, true);
+    }
+
+    fn resolve_variable(
+        &mut self,
+        var: &Variable<'src>,
+        span: Span,
+        id: NodeId,
+    ) -> Result<(), ResolveError> {
+        let identifier = &var.ident;
+        if !self.scopes.is_empty()
+            && self.scopes.last().unwrap().contains_key(&identifier.symbol)
+            && !self.scopes.last().unwrap().get(&identifier.symbol).unwrap()
+        {
+            return Err(ResolveError {
+                kind: ResolveErrorKind::UninitializedVariable(
+                    identifier.symbol.to_string(),
+                ),
+                span,
+            });
+        }
+        self.resolve_local(id, identifier.symbol);
+
+        Ok(())
     }
 
     fn resolve_local(&mut self, id: NodeId, name: &'src str) {
