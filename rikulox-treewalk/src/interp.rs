@@ -203,7 +203,7 @@ impl<'src> TreeWalkInterpreter<'src> {
                             });
                         }
                     },
-                    UnaryOp::Bang => Value::Bool(right.is_truthy()),
+                    UnaryOp::Bang => Value::Bool(!right.is_truthy()),
                 }
             }
             ExprKind::Grouping(expr) => self.eval(expr.as_ref())?,
@@ -572,3 +572,6 @@ impl<'src> Default for TreeWalkInterpreter<'src> {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests;
